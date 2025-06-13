@@ -7,7 +7,16 @@ function CoralCT_public
 % This script points to an example data server, not the full one. Some data
 % submitters have chosen to restrict access to their core images until
 % publication, so the full data server location is not publicly released.
-% The full version of the CoralCT app internally points to the full server.
+% This script is not intended to be used for analysis. Please use the main
+% CoralCT app to conduct any measurements. Additionally, this script may
+% encounter errors as not all features have been tested following redaction
+% of non-public aspects from the main app script. Extra variable names may
+% also exist, due to removal of features associated with usernames.
+%
+% Built with MATLAB 2023a. Other MATLAB versions might encounter lack of
+% functionality or errors. As noted above, the CoralCT app should be used
+% for doing any actual work, this code is shared for the sake of
+% transparency.
 %
 % Use the MATLAB "Run" button to execute this script and then interact with
 % the program through the user interface that opens.
@@ -17,7 +26,7 @@ function CoralCT_public
 %
 %   PLEASE CITE AS:
 %   DeCarlo TM, Whelehan A, Hedger B, Perry D, Pompel M, Jasnos O, 
-%   Strange A (2024b) CoralCT: A platform for transparent and collaborative
+%   Strange A (2024) CoralCT: A platform for transparent and collaborative
 %   analyses of growth parameters in coral skeletal cores. Limnology and 
 %   Oceanography: Methods.
 %   ============================
@@ -48,11 +57,11 @@ function CoralCT_public
 
 % set global variables
 global selpath saveCTdata coralDir gen X ha3 UserFig fileOpen row col
-global userBands coreIn hpxS layers pxS processNumber titleName
+global userBands coreIn hpxS layers pxS titleName
 global coralName currentSections saveName newRotTotBands xs ys
 global slabDraw areWeDone jump2band insertThisBand band2delete coral
 global densityWholeCore extension densityTotal volume cracks crackLayers
-global bottomCore topCore h2 LDBdata totBands2 thisSectionName
+global bottomCore topCore h2 h3 h3_width h3_std LDBdata totBands2 thisSectionName
 global h_drive dirRow thisCoralName band2erase subRegionName
 global p_axial p_arc p_box b_points p_degrees t_degrees flipCore x1 y1
 global collectionYear collectionMonth moveOn dataOwner serverChoice xrayPos
@@ -61,7 +70,7 @@ global xrayDPI smoothed_on dataOwners
 % hide standard figures
 set(0,'DefaultFigureVisible','off');
 
-CoralCTversion = 2.45;
+CoralCTversion = 2.64;
 CoralCTformat = 'mchips'; % 'mchips' (Mac) or 'windows'
 
 themeColor1 = [0.30, 0.75, 0.93];
@@ -84,6 +93,8 @@ crackTol = 1; % pixels in "gap" to define cracks in core. See L&O Methods public
 thresh = []; % initialize, this is for defining skeleton vs surrounding air space
 saveLocal = []; % toggle to remember working directory
 unsaveLocal = []; % toggle to stope remembering working directory
+coastlon = [];
+coastlat = [];
 
 % initialize figure, set visibility Off until finished setting up
 if strcmp(CoralCTformat,'mchips') || strcmp(CoralCTformat,'windows')
@@ -100,12 +111,12 @@ refPath0 = which('ref_file.mat');
 refPath0split = strsplit(refPath0,'ref_file.mat');
 refPath = refPath0split{1};
 
-% Set location of FTP Server:
-ftp_ip1 = '64.20.47.182'; % could use different server for login info if desired
-ftp_ip2 = '64.20.47.182'; % main data location
-ftp_user1 = 'coralct@st56912.ispot.cc';
-ftp_user2 = 'coralct@st56912.ispot.cc';
-ftp_password = 'coralctexample';
+% Set location of sftp Server:
+ftp_ip1 = 'access-5017242120.webspace-host.com'; % could use different server for login info if desired
+ftp_ip2 = 'access-5017242120.webspace-host.com'; % main data location
+ftp_user1 = 'a2222258';
+ftp_user2 = 'a2222258';
+ftp_password = 'We<3Corals';
 
 % loading vid at intro
 if strcmp(CoralCTformat,'mchips') || strcmp(CoralCTformat,'windows')
@@ -238,8 +249,8 @@ end
         end
     end
 
-% make sure we can connect to FTP server 1
-try cache1 = ftp(ftp_ip1,ftp_user1,ftp_password);
+% make sure we can connect to sftp server 1
+try cache1 = sftp(ftp_ip1,ftp_user1,"Password",ftp_password);
 catch
     if strcmp(CoralCTformat,'mchips') || strcmp(CoralCTformat,'windows')
         set(UserFig0,'Visible','on')
@@ -247,7 +258,7 @@ catch
     end
 end
 
-% make sure we can access CoralCache folder of FTP server 1
+% make sure we can access CoralCache folder of sftp server 1
 try cd(cache1,'/CoralCache');
 catch
     if strcmp(CoralCTformat,'mchips') || strcmp(CoralCTformat,'windows')
@@ -261,7 +272,7 @@ if strcmp(CoralCTformat,'mchips') || strcmp(CoralCTformat,'windows')
     selectDirHelpIn = uicontrol(UserFig0,'Style','pushbutton',...
         'String',{'Help'},'Visible','on',...
         'Position',[540,10,50,30],'Units','normalized','BackgroundColor',[255, 189, 68]/256,'ForegroundColor',[0,0,0],'FontSize',11,'FontName','Arial','Callback',@selectDirHelp_fun);
-    htextLink1 = uihyperlink(UserFig0,'URL','www.coralct.org','Text','www.coralct.org',...
+    htextLink1 = uihyperlink(UserFig0,'URL','https://www.sclerochronologylab.com/coralct.html','Text','www.coralct.org',...
         'FontSize',14,'FontName','Arial','Visible','on','Position',[390,10,120,30]);
 else
     selectDirHelpIn = uicontrol(UserFig,'Style','pushbutton',...
@@ -346,11 +357,11 @@ end
 
 pause(0.01) % to ensure refreshed figures
 
-% download the core master directory from the FTP server and save it on the
+% download the core master directory from the sftp server and save it on the
 % local driver in a folder called "my_corals"
 try mget(cache1,'coral_directory_master.txt',fullfile(selpath,'my_corals'));
 catch
-    cache1 = ftp(ftp_ip1,ftp_user1,ftp_password); % make sure we can connect to FTP server 1
+    cache1 = sftp(ftp_ip1,ftp_user1,"Password",ftp_password); % make sure we can connect to sftp server 1
     cd(cache1,'/CoralCache');
     mget(cache1,'coral_directory_master.txt',fullfile(selpath,'my_corals'));
 end
@@ -369,6 +380,7 @@ latest_version = []; % to display latest version number
         set(latestVersionIn,'Visible','off')
         set(lblCheckingUpdates,'Visible','on')
         pause(0.01)
+        mget(cache1,'latest_version.csv',refPath);
         latest_version = importdata(fullfile(refPath,'latest_version.csv'));
         delete(fullfile(refPath,'latest_version.csv'))
         if latest_version == CoralCTversion % we are up to date
@@ -423,9 +435,9 @@ downloadLatestVersionIn = uicontrol(UserFig,'Style','pushbutton',...
                 websave(fullfile(selpath,'CoralCT_installer'),latest_url{1});
                 unzip(fullfile(selpath,'CoralCT_installer.zip'),fullfile(selpath,'CoralCT_installer'));
                 delete(fullfile(selpath,'CoralCT_installer.zip'))
+                dload_success = 1;
             catch
             end
-            dload_success = 1;
         end
         if dload_success == 0
             set(lblGotLatestVersion,'String','Download not successful. Please go to www.coralct.org')
@@ -478,6 +490,10 @@ getUserGuideIn = uicontrol(UserFig,'Style','pushbutton',...
 % Note we skip row 1 because it's the header information
 regionList = unique(coralDir.textdata(2:end,3));
 
+% Print text on figure to say we will check registration
+lblVerifying = uicontrol(UserFig,'Style','text','String','We will email you soon once your registration is confirmed',...
+    'Position',[150,590,700,30],'Units','normalized','FontSize',12,'FontName','Arial','Visible','off');
+
 loginIn = uicontrol(UserFig,'Style','pushbutton',...
     'String',{'Login'},'Visible','on',...
     'Position',[600,710,160,60],'Units','normalized','FontSize',14,'FontName','Arial','BackgroundColor',themeColor1,'Callback',@login);
@@ -488,19 +504,13 @@ noSuchUser = uicontrol(UserFig,'Style','text','String','Username does not exist'
 wrongPassword = uicontrol(UserFig,'Style','text','String','Incorrect password',...
     'Position',[250,600,500,20],'Units','normalized','FontSize',12,'FontName','Arial','Visible','off');
 
-unmatchedPassword = uicontrol(UserFig,'Style','text','String','Passwords do not match',...
-    'Position',[250,600,500,20],'Units','normalized','FontSize',12,'FontName','Arial','Visible','off');
-
-missingName = uicontrol(UserFig,'Style','text','String','Need to provide first and last name',...
-    'Position',[250,600,500,20],'Units','normalized','FontSize',12,'FontName','Arial','Visible','off');
-
 htextHelp = uicontrol(UserFig,'Style','text','String','Email us at support@coralct.org for assistance',...
     'Position',[650,15,500,20],'Units','normalized','FontSize',10,'FontName','Arial','Visible','on');
 
-htextLink2 = uihyperlink(UserFig,'URL','www.coralct.org','Text','www.coralct.org',...
+htextLink2 = uihyperlink(UserFig,'URL','https://www.sclerochronologylab.com/coralct.html','Text','www.coralct.org',...
     'Position',[575,15,500,20],'FontSize',14,'FontName','Arial','Visible','on');
 
-htextLink3 = uihyperlink(UserFig,'URL','www.coralct.org','Text','www.coralct.org',...
+htextLink3 = uihyperlink(UserFig,'URL','https://www.sclerochronologylab.com/coralct.html','Text','www.coralct.org',...
     'Position',[980,15,125,24],'FontSize',14,'FontName','Arial','Visible','off');
 
 uiAbout = uicontrol(UserFig,'Style','pushbutton',...
@@ -544,6 +554,9 @@ htextAbout = uicontrol(UserFig,'Style','text','String',' ',...
         set(loginIn,'Visible','off')
         set(UserSetIn,'Visible','off')
         set(htextUser,'Visible','off')
+        if strcmp(CoralCTformat,'mchips') || strcmp(CoralCTformat,'windows')
+            set(saveLogin, 'Visible','off')
+        end
         set(htextPassword,'Visible','off')
         set(passwordIn,'Visible','off')
         set(noSuchUser,'Visible','off')
@@ -561,8 +574,10 @@ htextAbout = uicontrol(UserFig,'Style','text','String',' ',...
         set(getUserGuideIn,'Visible','off')
         set(gettingUserGuide,'Visible','off')
         set(lblneed2Update,'Visible','off')
-        set(lblUpdatedServer,'Visible','off')
         set(lblUp2date,'Visible','off')
+        if strcmp(CoralCTformat,'mchips') || strcmp(CoralCTformat,'windows')
+            set(saveLogin,'Visible','off')
+        end
         set(uiAboutCancel,'Visible','off')
         set(uiAbout,'Visible','off')
 
@@ -581,6 +596,9 @@ htextAbout = uicontrol(UserFig,'Style','text','String',' ',...
         set(loginIn,'Visible','on')
         set(UserSetIn,'Visible','on')
         set(htextUser,'Visible','on')
+        if strcmp(CoralCTformat,'mchips') || strcmp(CoralCTformat,'windows')
+            set(saveLogin, 'Visible','on')
+        end
         set(htextPassword,'Visible','on')
         set(passwordIn,'Visible','on')
         set(noSuchUser,'Visible','on')
@@ -601,9 +619,16 @@ htextAbout = uicontrol(UserFig,'Style','text','String',' ',...
             set(lblneed2Update,'Visible','off')
         end
         set(lblUp2date,'Visible','off')
-        set(lblUpdatedServer,'Visible','off')
+        if strcmp(CoralCTformat,'mchips') || strcmp(CoralCTformat,'windows')
+            set(saveLogin,'Visible','on')
+        end
 
     end
+
+if strcmp(CoralCTformat,'mchips') || strcmp(CoralCTformat,'windows')
+    saveLogin = uicheckbox(UserFig,'Text','Remember me?','Value',0,'Position',[600,670,150,25],...
+        'FontSize',14,'FontName','Arial');
+end
 
 % initialize map
 pWorldMap = [];
@@ -613,19 +638,64 @@ saveFileName = [];
 % login function
     function login(src,event)
 
-        saveFileName = UserSetIn.String;
-
         lblLoading = uicontrol(UserFig,'Style','text','String','Loading, please wait',...
-            'Position',[250,560,500,20],'Units','normalized','FontSize',12,'FontName','Arial','Visible','on');
+            'Position',[250,560,500,40],'Units','normalized','FontSize',12,'FontName','Arial','Visible','on');
 
         pause(0.001)
 
         if strcmp(CoralCTformat,'mchips') || strcmp(CoralCTformat,'windows')
+            if saveLogin.Value == 1
                 checkedIn = 0;
+            elseif saveLogin.Value == 0 && checkedIn == 1
+                checkedIn = 0;
+            end
         end
 
         if checkedIn == 0
+
+            try
             mget(cache1,'user_directory_names.csv',refPath);
+            catch
+                try
+                    cache1 = sftp(ftp_ip1,ftp_user1,"Password",ftp_password);
+                    cd(cache1,'CoralCache')
+                    mget(cache1,'user_directory_names.csv',refPath);
+                catch
+                    try
+                        connectTimes = [1,2,3,5,10,60,60*12]; % minutes
+                        connectionEstablished = 0;
+                        for ij = 1:length(connectTimes)
+                            if connectionEstablished == 0
+                                if connectTimes(ij) == 1
+                                    waitText = [' ',num2str(connectTimes(ij)),' minute.']
+                                else
+                                    waitText = [' ',num2str(connectTimes(ij)),' minutes.']
+                                end
+                                set(lblLoading,'Units','Pixels','Visible','on',...
+                                    'String',{'Error connecting to server.';strcat('Trying again in',waitText)})
+                                pause(connectTimes(ij)*60)
+                                try
+                                    cache1 = sftp(ftp_ip1,ftp_user1,"Password",ftp_password);
+                                    cd(cache1,'CoralCache')
+                                    mget(cache1,'user_directory_names.csv',refPath);
+                                    connectionEstablished = 1;
+                                    set(lblLoading,'Visible','off')
+                                catch
+                                end
+                            end
+                        end
+                        if connectionEstablished == 0
+                            zz = abjfl; % if we made it through end of loop, cause an error to display error code below
+                        end
+                    catch
+                        set(lblLoading,'Visible','on',...
+                            'String',{'Error connecting to server. (code 025)';'Please try again later.'})
+                        while 1==1
+                            pause
+                        end
+                    end
+                end
+            end
             fid = fopen(fullfile(refPath,'user_directory_names.csv'));
             users = textscan(fid,'%s %s %s %s %s','Delimiter',',');
             try fclose(fid);
@@ -638,6 +708,33 @@ saveFileName = [];
             if length(idx) > 0
                 if strcmp(users{2}{idx},passwordIn.String)
                     loginSuccess = 1;
+                    if strcmp(CoralCTformat,'mchips') || strcmp(CoralCTformat,'windows')
+                        if saveLogin.Value == 1
+                            C = [{UserSetIn.String}, {passwordIn.String}];
+                            fid6 = fopen(fullfile(selpath,'my_login.csv'));
+                            writecell(C,fullfile(selpath,'my_login.csv'));
+                            try fclose(fid6);
+                            catch
+                            end
+                            savedLoginFilename = fullfile(selpath,strcat(UserSetIn.String,'_',passwordIn.String,'.csv'));
+                            fid7 = fopen(savedLoginFilename);
+                            writecell(C,savedLoginFilename);
+                            try fclose(fid7);
+                            catch
+                            end
+                            try mput(cache1,savedLoginFilename)
+                            catch
+                                savedLoginFilename = fullfile(selpath,strcat(UserSetIn.String,'_saved_pwd.csv'));
+                                fid7 = fopen(savedLoginFilename);
+                                writecell(C,savedLoginFilename);
+                                try fclose(fid7);
+                                catch
+                                end
+                                mput(cache1,savedLoginFilename)
+                            end
+                            delete(savedLoginFilename);
+                        end
+                    end
                 else
                     try delete(lblLoading)
                     catch
@@ -656,7 +753,20 @@ saveFileName = [];
         end
 
         if strcmp(CoralCTformat,'mchips') || strcmp(CoralCTformat,'windows')
-            if checkedIn == 1
+            if saveLogin.Value == 0
+                try delete(fullfile(selpath,'my_login.csv'));
+                catch
+                end
+                try
+                    savedLoginFilename = fullfile(strcat(UserSetIn.String,'_',passwordIn.String,'.csv'));
+                    delete(cache1,savedLoginFilename)
+                catch
+                end
+            end
+        end
+
+        if strcmp(CoralCTformat,'mchips') || strcmp(CoralCTformat,'windows')
+            if checkedIn == 1 && saveLogin.Value == 1
                 if strcmp(UserSetIn.String,my_login{1}{1})
                     if strcmp(passwordIn.String,my_login{2}{1})
                         loginSuccess = 1;
@@ -697,6 +807,8 @@ saveFileName = [];
                 set(htextTotalCores,'Visible','off')
                 set(leaderBoard,'Visible','off')
                 set(leaderBoard_2,'Visible','off')
+                set(saveLogin,'Visible','off')
+                set(saveLogin, 'Visible','off')
             end
             set(latestVersionIn,'Visible','off')
             set(downloadLatestVersionIn,'Visible','off')
@@ -714,7 +826,9 @@ saveFileName = [];
             pWorldMap = worldmap([-90 90],[20 380]);
             plabel('off')
             mlabel('off')
-            geoshow('landareas.shp', 'FaceColor', [0 0 0])
+            %geoshow('landareas.shp', 'FaceColor', [0 0 0])
+            load('coastlines.mat')
+            patchm(coastlat,coastlon,'k','EdgeColor','none')
             plotm(coralDir.data(:,3),coralDir.data(:,4),'ko','MarkerEdgeColor','k', 'MarkerFaceColor',[0.96,0.51,0.58]);
 
             try delete(lblLoading)
@@ -802,6 +916,7 @@ htextUser = uicontrol(UserFig,'Style','text','String','Username:',...
 % Create edit bar for user to type username
 UserSetIn = uicontrol(UserFig,'Style','Edit','String','TestUser1',...
     'Position',[475,750,100,25],'Units','normalized','Callback', @UserSet_Callback);
+saveFileName = UserSetIn.String;
 
 % Default username (if none given):
 % saveFileName = 'undefined';
@@ -837,21 +952,21 @@ passwordInConfirm = uicontrol(UserFig,'Style','Edit','Visible','off',...
 
 % Print text on figure to type in first name
 htextFirstName = uicontrol(UserFig,'Style','text','String','First Name:','Visible','off',...
-    'Position',[320,670,150,25],'Units','normalized','BackgroundColor',themeColor1,'ForegroundColor',[0,0,0],'FontSize',12,'FontName','Arial');
+    'Position',[320,710,150,25],'Units','normalized','BackgroundColor',themeColor1,'ForegroundColor',[0,0,0],'FontSize',12,'FontName','Arial');
 
 name1 = '';
 % Create edit bar for user to type first name
 firstNameIn = uicontrol(UserFig,'Style','Edit','Visible','off',...
-    'Position',[475,670,100,25],'Units','normalized','Callback', @name1_Callback);
+    'Position',[475,710,100,25],'Units','normalized','Callback', @name1_Callback);
 
 % Print text on figure to type in last name
 htextLastName = uicontrol(UserFig,'Style','text','String','Last Name:','Visible','off',...
-    'Position',[600,670,150,25],'Units','normalized','BackgroundColor',themeColor1,'ForegroundColor',[0,0,0],'FontSize',12,'FontName','Arial');
+    'Position',[600,710,150,25],'Units','normalized','BackgroundColor',themeColor1,'ForegroundColor',[0,0,0],'FontSize',12,'FontName','Arial');
 
 name2 = '';
 % Create edit bar for user to type last name
 lastNameIn = uicontrol(UserFig,'Style','Edit','Visible','off',...
-    'Position',[760,670,100,25],'Units','normalized','Callback', @name2_Callback);
+    'Position',[760,710,100,25],'Units','normalized','Callback', @name2_Callback);
 
 % Function to store username
     function password_Callback(src,event)
@@ -885,7 +1000,7 @@ if strcmp(CoralCTformat,'mchips') || strcmp(CoralCTformat,'windows')
         'ForegroundColor',themeColor1,'FontSize',16,'FontName','Arial');
 
     htextTotalCores = uicontrol(UserFig,'Style','text','String',...
-        sprintf('Total cores in CoralCache: %s',num2str(length(unique(coralDir.textdata(:,1))))),...
+        sprintf('Total cores in CoralCache: %s',num2str(length(unique(coralDir.textdata(2:end,1))))),...
         'Visible','on',...
         'Position',[335,160,420,30],'Units','normalized','BackgroundColor','none',...
         'ForegroundColor',themeColor1,'FontSize',14,'FontName','Arial');
@@ -991,6 +1106,12 @@ mainMenuIn = uicontrol(UserFig,'Style','pushbutton',...
         catch
         end
 
+        try
+            delete(calibPlot)
+            delete(calibLine)
+        catch
+        end
+
         if strcmp(CoralCTformat,'mchips') || strcmp(CoralCTformat,'windows')
             try delete(dispVidCT)
                 set(lblGracious,'Visible','off')
@@ -1066,6 +1187,7 @@ mainMenuIn = uicontrol(UserFig,'Style','pushbutton',...
         set(saveDataIn, 'Visible','on')
         set(htextUser, 'Visible','off')
         if strcmp(CoralCTformat,'mchips') || strcmp(CoralCTformat,'windows')
+            set(saveLogin, 'Visible','off')
             set(userProfileIn,'Visible','on')
             set(coreDirIn,'Visible','on')
         end
@@ -1097,6 +1219,7 @@ mainMenuIn = uicontrol(UserFig,'Style','pushbutton',...
         set(regionIn,'Visible','on')
         set(htextRegion,'Visible','on')
         set(SubmitDataIn,'Visible','on')
+        set(calibCurveIn,'Visible','on') % ADD BACK IN FOR CALIB BUTTON
         set(htextLink4,'Visible','on')
         set(lblThanksCT,'Visible','off')
         set(lblThanksMeta,'Visible','off')
@@ -1112,6 +1235,24 @@ mainMenuIn = uicontrol(UserFig,'Style','pushbutton',...
         set(sendVideoIn,'Visible','off')
         set(uiAbout3,'Visible','off')
         set(uiAboutCancel3,'Visible','off')
+        set(directSubmit0In,'Visible','off')
+
+        set(lblStderror,'Visible','off')
+        set(calibCurveCreateIn,'Visible','off')
+        set(calibCurveSendIn,'Visible','off')
+        set(calibCurveSendDoneIn,'Visible','off')
+        set(calibCurveSendChooseCoreIn,'Visible','off')
+        set(haDens,'Visible','off')
+        set(htextCalibStatus,'Visible','off')
+        set(standardFoldersIn,'Visible','off')
+        set(htextStandardFolders,'Visible','off')
+        set(densTable,'Visible','off')
+        set(standardGroupIn,'Visible','off')
+        set(htextStandardGroup,'Visible','off')
+        set(htextKnownDens,'Visible','off')
+        set(stdDenSetIn,'Visible','off')
+        set(calibCurveIn,'Visible','on')
+
     end
 
 % Quit button
@@ -1170,6 +1311,7 @@ userTable3 = [];
     function userProfile(src,event)
 
         if strcmp(CoralCTformat,'mchips') || strcmp(CoralCTformat,'windows')
+            set(saveLogin, 'Visible','off')
             set(userProfileIn,'Visible','off')
             set(coreDirIn,'Visible','off')
         end
@@ -1217,6 +1359,7 @@ userTable3 = [];
         set(getDataIn,'Visible','off')
         set(downloadTimePreview,'Visible','off')
         set(SubmitDataIn,'Visible','off')
+        set(calibCurveIn,'Visible','off')
 
         set(h_map_cover,'Visible','on');
 
@@ -1224,7 +1367,41 @@ userTable3 = [];
 
         try mget(cache1,'log.csv',strcat(refPath));
         catch
-            cache1 = ftp(ftp_ip1,ftp_user1,ftp_password); % make sure we can connect to FTP server 1
+            try
+                cache1 = sftp(ftp_ip1,ftp_user1,"Password",ftp_password);
+            catch
+                try
+                    connectTimes = [1,2,3,5,10,60,60*12]; % minutes
+                    connectionEstablished = 0;
+                    for ij = 1:length(connectTimes)
+                        if connectionEstablished == 0
+                            if connectTimes(ij) == 1
+                                waitText = [' ',num2str(connectTimes(ij)),' minute.']
+                            else
+                                waitText = [' ',num2str(connectTimes(ij)),' minutes.']
+                            end
+                            set(lblOverwrite,'Units','Pixels','Visible','on',...
+                                'String',{'Error connecting to server.';strcat('Trying again in',waitText)})
+                            pause(connectTimes(ij)*60)
+                            try
+                                cache1 = sftp(ftp_ip1,ftp_user1,"Password",ftp_password);
+                                connectionEstablished = 1;
+                                set(lblOverwrite,'Visible','off')
+                            catch
+                            end
+                        end
+                    end
+                    if connectionEstablished == 0
+                        zz = abjfl; % if we made it through end of loop, cause an error to display error code below
+                    end
+                catch
+                    set(lblOverwrite,'Visible','on',...
+                        'String',{'Error connecting to server. (code 025)';'Please try again later.'})
+                    while 1==1
+                        pause
+                    end
+                end
+            end
             cd(cache1,'/CoralCache');
             mget(cache1,'log.csv',strcat(refPath));
             close(cache1);
@@ -1237,6 +1414,20 @@ userTable3 = [];
         log_conf = coresLog{5};
 
         delete(fullfile(refPath,'log.csv'))
+
+        try mget(cache1,'user_agreement_scores.csv',strcat(refPath));
+        catch
+            cache1 = sftp(ftp_ip1,ftp_user1,"Password",ftp_password); % make sure we can connect to sftp server 1
+            cd(cache1,'/CoralCache');
+            mget(cache1,'user_agreement_scores.csv',strcat(refPath));
+            close(cache1);
+        end
+        fid9 = fopen(fullfile(refPath,'user_agreement_scores.csv'));
+        userScores = textscan(fid9,'%s %s','Delimiter',',');
+        scores_users = userScores{1};
+        scores_scores = userScores{2};
+
+        delete(fullfile(refPath,'user_agreement_scores.csv'))
 
         log_bands_double = NaN(length(log_bands)-1,1);
         for ib = 1:length(log_bands_double)
@@ -1257,6 +1448,9 @@ userTable3 = [];
         unq_core_bands = NaN(num_cores,1);
         core_conf = NaN(num_cores,1);
 
+        scores_row = find(strcmp(scores_users,saveFileName));
+        my_score = scores_scores(scores_row);
+
         for ia = 1:num_cores
             this_core_rows = find(strcmp(log_cores(user_rows),unq_cores(ia)));
             [unq_core_bands(ia), loc] = max(log_bands_double(user_rows(this_core_rows)-1));
@@ -1264,7 +1458,7 @@ userTable3 = [];
             core_conf(ia) = log_conf_double(user_rows(this_core_rows(loc))-1);
         end
 
-        userTable1_prep = table([{saveFileName}; {num2str(num_cores)}; {num2str(num_bands)}; {'coming soon'}]);
+        userTable1_prep = table([{saveFileName}; {num2str(num_cores)}; {num2str(num_bands)}; my_score]);
         userTable1_prep.Properties.RowNames = {'Username'; 'Cores processed'; 'Bands processed'; 'Inter-user agreement score'};
         userTable1_prep.Properties.VariableNames = {' '};
 
@@ -1288,6 +1482,466 @@ userTable3 = [];
 
     end
 
+%puts text on telling you to select your region
+htextStandardGroup = uicontrol(UserFig,'Style','text','String','Select standard group:','Visible','off',...
+    'Position',[680,610,160,25],'Units','normalized','BackgroundColor','none','ForegroundColor',themeColor3,'FontSize',11,'FontName','Arial');
+
+standardGroupIn = uicontrol(UserFig,'Style','popupmenu',...
+    'Position',[680,575,250,35],'Units','normalized',...
+    'String','','Visible','off',...
+    'Callback',@chosenStdGroup);
+
+stdGroups = [];
+htextStandardFolders = [];
+standardFoldersIn = [];
+htextKnownDens = [];
+stdDenSetIn = [];
+densTable0 = [];
+densTable = [];
+densValues = [];
+densNames = [];
+firstStd = 1;
+stdGroupsNum = [];
+
+    function chosenStdGroup(src,event)
+
+        stdGroupsNum = standardGroupIn.Value;
+        firstStd = 1;
+        densValues = [];
+        densNames = [];
+        densTable0 = table([],[]);
+        densTable0.Properties.VariableNames = {'standard','density'};
+
+        densTable = uitable(UserFig,'Data',densTable0,'Position',[150 550 200 25*(size(densTable0,1)+1)],...
+            'Visible','on','Units','normalized');
+
+        try close(cache2)
+        catch
+        end
+        try cache2 = sftp(ftp_ip2,ftp_user2,"Password",ftp_password); %
+            cd(cache2,strcat('/hd1/standards/',stdGroups{stdGroupsNum},'/'))
+            dirStdFolders = dir(cache2);
+            stdFolders = {'';''};
+            for jjj = 1:length(dirStdFolders)
+                stdFolders{jjj} = dirStdFolders(jjj).name;
+            end
+        catch
+            connectTimes = [1,2,3,5,10,60,60*12]; % minutes
+            connectionEstablished = 0;
+            for ij = 1:length(connectTimes)
+                if connectionEstablished == 0
+                    if connectTimes(ij) == 1
+                        waitText = [' ',num2str(connectTimes(ij)),' minute.']
+                    else
+                        waitText = [' ',num2str(connectTimes(ij)),' minutes.']
+                    end
+                    set(htextCalibStatus,'Visible','on',...
+                        'String',{'Error connecting to server.';strcat('Trying again in',waitText)},...
+                        'Units','normalized')
+                    pause(connectTimes(ij)*60)
+                    try
+                        cache2 = sftp(ftp_ip2,ftp_user2,"Password",ftp_password); %
+                        cd(cache2,strcat('/hd1/standards/',stdGroups{stdGroupsNum},'/'))
+                        dirStdFolders = dir(cache2);
+                        stdFolders = {'';''};
+                        for jjj = 1:length(dirStdFolders)
+                            stdFolders{jjj} = dirStdFolders(jjj).name;
+                        end
+                        connectionEstablished = 1;
+                        set(htextCalibStatus,'Visible','off')
+                    catch
+                    end
+                end
+            end
+            if connectionEstablished == 0
+                zz = abjfl; % if we made it through end of loop, cause an error to display error code below
+            end
+            set(htextCalibStatus,'Visible','on',...
+                'String',{'Error connecting to server. (code 044)';'Please try again later.'},...
+                'Units','normalized')
+            while 1==1
+                pause
+            end
+        end
+
+        htextStandardFolders = uicontrol(UserFig,'Style','text','String','Select standard:','Visible','on',...
+            'Position',[660,525,150,25],'Units','normalized','BackgroundColor','none','ForegroundColor',themeColor3,'FontSize',11,'FontName','Arial');
+
+        standardFoldersIn = uicontrol(UserFig,'Style','popupmenu',...
+            'Position',[680,490,250,35],'Units','normalized',...
+            'String',stdFolders,'Visible','on','Callback',@chosenStdFolder);
+
+        function chosenStdFolder(src,event)
+
+            try delete(htextKnownDens)
+            catch
+            end
+            htextKnownDens = uicontrol(UserFig,'Style','text','String',sprintf('Known density (g / cubic cm):'),'Visible','on',...
+            'Position',[670,430,200,25],'Units','normalized','BackgroundColor','none','ForegroundColor',themeColor3,'FontSize',11,'FontName','Arial');
+
+            try delete(stdDenSetIn)
+            catch
+            end
+            stdDenSetIn = uicontrol(UserFig,'Style','Edit','Visible','on',...
+                'Position',[680,405,100,25],'Units','normalized','Callback', @addDensToList);
+
+        end
+
+    end
+
+    function addDensToList(src,event)
+
+        if firstStd == 1
+            densNames = standardFoldersIn.String{standardFoldersIn.Value};
+        else
+            densNames = [densNames;string(standardFoldersIn.String{standardFoldersIn.Value})];
+        end
+        densValues = [densValues;str2num(stdDenSetIn.String)];
+        if firstStd == 1
+            densTable0 = table({densNames},{densValues});
+        else
+            densTable0 = table(densNames,densValues);
+        end
+        densTable0.Properties.VariableNames = {'standard','density'};
+        delete(densTable)
+        densTable = uitable(UserFig,'Data',densTable0,'Position',[150 550 200 24*(size(densTable0,1)+1)],...
+                'Visible','on','Units','normalized');
+
+        firstStd = 0;
+
+        if size(densTable0,1) > 1
+            set(calibCurveCreateIn,'Visible','on')
+        end
+
+    end
+haDens = [];
+
+thisFit = [];
+doingDensCalib = 0;
+
+htextCalibStatus = uicontrol(UserFig,'Style','text','String','','Visible','off',...
+            'Position',[650,330,250,40],'Units','normalized','BackgroundColor','none','ForegroundColor',themeColor3,'FontSize',11,'FontName','Arial');
+
+calibPlot = [];
+calibLine = [];
+    function densCurveMake(src,event)
+
+        set(calibCurveCreateIn,'Enable','off')
+        pause(0.01)
+
+        doingDensCalib = 1;
+
+        HUs = NaN(size(densValues));
+
+        for iDens = 1:length(densValues)
+
+            try close(cache2)
+            catch
+            end
+            try
+                cache2 = sftp(ftp_ip2,ftp_user2,"Password",ftp_password); %
+                cd(cache2,strcat('/hd1/standards/',stdGroups{stdGroupsNum},'/',densNames(iDens)));
+                mget(cache2,'dicoms.zip',fullfile(selpath,'my_corals','standards'));
+            catch
+                connectTimes = [1,2,3,5,10,60,60*12]; % minutes
+                connectionEstablished = 0;
+                for ij = 1:length(connectTimes)
+                    if connectionEstablished == 0
+                        if connectTimes(ij) == 1
+                            waitText = [' ',num2str(connectTimes(ij)),' minute.']
+                        else
+                            waitText = [' ',num2str(connectTimes(ij)),' minutes.']
+                        end
+                        set(htextCalibStatus,'Visible','on',...
+                            'String',{'Error connecting to server.';strcat('Trying again in',waitText)},...
+                            'Units','normalized')
+                        pause(connectTimes(ij)*60)
+                        try
+                            cache2 = sftp(ftp_ip2,ftp_user2,"Password",ftp_password); %
+                            cd(cache2,strcat('/hd1/standards/',stdGroups{stdGroupsNum},'/',densNames(iDens)));
+                            mget(cache2,'dicoms.zip',fullfile(selpath,'my_corals','standards'));
+                            connectionEstablished = 1;
+                            set(htextCalibStatus,'Visible','off')
+                        catch
+                        end
+                    end
+                end
+                if connectionEstablished == 0
+                    zz = abjfl; % if we made it through end of loop, cause an error to display error code below
+                end
+                set(htextCalibStatus,'Visible','on',...
+                    'String',{'Error connecting to server. (code 042)';'Please try again later.'},...
+                    'Units','normalized')
+                while 1==1
+                    pause
+                end
+            end
+
+            set(htextCalibStatus,'Visible','on','String',sprintf('Working on standard %s',densNames(iDens)))
+
+            fileOpen = fullfile(selpath,'my_corals','standards');
+            if exist(fullfile(selpath,'my_corals','standards','dicoms'),'dir')
+                rmdir(fullfile(selpath,'my_corals','standards','dicoms'),'s')
+            end
+            unzip(fullfile(selpath,'my_corals','standards','dicoms.zip'),fullfile(selpath,'my_corals','standards','dicoms'))
+
+            ha3 = uiaxes(UserFig,'Units','Pixels','Position',[715,40,250,60],'Units','normalized','Visible','on');
+            ha3.InteractionOptions.DatatipsSupported = 'off';
+            ha3.InteractionOptions.ZoomSupported = "off";
+            ha3.InteractionOptions.PanSupported = "off";
+            ha3.Toolbar.Visible = 'off';
+            hold(ha3,'on')
+            set(ha3,'Xtick',[],'YTick',[],'XLim',[0 1],'YLim',[0 1])
+            set(ha3,'Visible','on')
+            loadData
+            gen = 'Porites';
+            chooseCoreFilter
+            buildCore
+            HU2dens = [1,0];
+            volumeDensity
+            HUs(iDens) = densityWholeCore;
+            doingDensCalib = 0;
+            set(ha3,'Visible','off')
+            delete(ha3)
+
+        end
+
+        set(htextCalibStatus,'Visible','off')
+
+        haDens = uiaxes(UserFig,'Units','Pixels','Position',[80,80,400,300],'Units','normalized','Color','white','xcolor','k','ycolor','k');
+        calibPlot = plot(haDens,densValues,HUs,'ko','LineWidth',2,'MarkerSize',10);
+        hold(haDens,'on')
+        thisFit = polyfit(densValues,HUs,1);
+        calibLine = plot(haDens,[min(densValues),max(densValues)],[min(densValues),max(densValues)]*thisFit(1)+thisFit(2),'r-','LineWidth',2);
+        ylabel(haDens,'Hounsfield Units (HU)')
+        xlabel(haDens,'Known density (g cm^{-3})')
+        set(haDens,'FontSize',14)
+
+        set(calibCurveSendIn,'Visible','on')
+        set(calibCurveSendChooseCoreIn,'Visible','on')
+        set(calibCurveSendDoneIn,'Visible','on')
+
+    end
+
+core4calibEqn = [];
+    function densCurveSendChooseCore(src,event)
+
+        core4calibEqn = calibCurveSendChooseCoreIn.String;
+        if length(find(strcmp(core4calibEqn,coralDir.textdata(:,1))))
+            set(htextCalibStatus,'Visible','off')
+        else
+            set(htextCalibStatus,'Visible','on','String',sprintf('Invalid core name'))
+        end
+
+    end
+
+    function densCurveSendDone(src,event)
+
+        set(htextCalibStatus,'Visible','off')
+        delete(calibPlot)
+        delete(calibLine)
+        set(calibCurveCreateIn,'Enable','on')
+        mainMenu
+
+    end
+
+    function densCurveSend(src,event)
+
+        set(calibCurveSendIn,'Enable','off')
+        set(calibCurveSendDoneIn,'Enable','off')
+
+        pause(0.01)
+        dirRow = find(strcmp(core4calibEqn,coralDir.textdata(:,1)));
+
+        if length(dirRow)
+
+            set(htextCalibStatus,'Visible','on','String',sprintf('Applying eqn. to core %s',core4calibEqn{1}))
+            pause(0.01)
+
+            coralDir.data(dirRow-1,10) = thisFit(1);
+            coralDir.data(dirRow-1,11) = thisFit(2);
+            coralDirHold = coralDir;
+            coralDirHold.textdata = coralDirHold.textdata(2:end,:);
+            coralDirStruct = struct('name',coralDirHold.textdata(:,1),...
+                'piece',coralDirHold.textdata(:,2),...
+                'region',coralDirHold.textdata(:,3),...
+                'sub_region',coralDirHold.textdata(:,4),...
+                'genus',coralDirHold.textdata(:,5),...
+                'owner',coralDirHold.textdata(:,6),...
+                'notes',coralDirHold.textdata(:,7),...
+                'hard_drive',coralDirHold.data(1,1),...
+                'flip',coralDirHold.data(1,2),...
+                'lat',coralDirHold.data(1,3),...
+                'lon',coralDirHold.data(1,4),...
+                'depth',coralDirHold.data(1,5),...
+                'month',coralDirHold.data(1,6),...
+                'year',coralDirHold.data(1,7),...
+                'file_size',coralDirHold.data(1,8),...
+                'unlocked',coralDirHold.data(1,9),...
+                'denslope',coralDirHold.data(1,10),...
+                'denintercept',coralDirHold.data(1,11),...
+                'ct',coralDirHold.data(1,12),...
+                'xraypos',coralDirHold.data(1,13),...
+                'dpi',coralDirHold.data(1,14));
+            for ic = 1:length(coralDirHold.data)
+                coralDirStruct(ic).hard_drive = coralDirHold.data(ic,1);
+                coralDirStruct(ic).flip = coralDirHold.data(ic,2);
+                coralDirStruct(ic).lat = coralDirHold.data(ic,3);
+                coralDirStruct(ic).lon = coralDirHold.data(ic,4);
+                coralDirStruct(ic).depth = coralDirHold.data(ic,5);
+                coralDirStruct(ic).month = coralDirHold.data(ic,6);
+                coralDirStruct(ic).year = coralDirHold.data(ic,7);
+                coralDirStruct(ic).file_size = coralDirHold.data(ic,8);
+                coralDirStruct(ic).unlocked = coralDirHold.data(ic,9);
+                coralDirStruct(ic).denslope = coralDirHold.data(ic,10);
+                coralDirStruct(ic).denintercept = coralDirHold.data(ic,11);
+                coralDirStruct(ic).ct = coralDirHold.data(ic,12);
+                coralDirStruct(ic).xraypos = coralDirHold.data(ic,13);
+                coralDirStruct(ic).dpi = coralDirHold.data(ic,14);
+            end
+            writetable(struct2table(coralDirStruct),fullfile(selpath,'my_corals','coral_directory_master.txt'),'Delimiter','\t')
+
+            try mput(cache1,fullfile(selpath,'my_corals','coral_directory_master.txt'));
+            catch
+                try
+                    cache1 = sftp(ftp_ip1,ftp_user1,"Password",ftp_password);
+                    cd(cache1,'CoralCache')
+                    mput(cache1,fullfile(selpath,'my_corals','coral_directory_master.txt'));
+                catch
+                    connectTimes = [1,2,3,5,10,60,60*12]; % minutes
+                    connectionEstablished = 0;
+                    for ij = 1:length(connectTimes)
+                        if connectionEstablished == 0
+                            if connectTimes(ij) == 1
+                                waitText = [' ',num2str(connectTimes(ij)),' minute.']
+                            else
+                                waitText = [' ',num2str(connectTimes(ij)),' minutes.']
+                            end
+                            set(htextCalibStatus,'Visible','on',...
+                                'String',{'Error connecting to server.';strcat('Trying again in',waitText)},...
+                                'Units','normalized')
+                            pause(connectTimes(ij)*60)
+                            try
+                                cache1 = sftp(ftp_ip1,ftp_user1,"Password",ftp_password);
+                                cd(cache1,'CoralCache')
+                                mput(cache1,fullfile(selpath,'my_corals','coral_directory_master.txt'));
+                                connectionEstablished = 1;
+                                set(htextCalibStatus,'Visible','off')
+                            catch
+                            end
+                        end
+                    end
+                    if connectionEstablished == 0
+                        zz = abjfl; % if we made it through end of loop, cause an error to display error code below
+                    end
+                    set(htextCalibStatus,'Visible','on',...
+                        'String',{'Error connecting to server. (code 042)';'Please try again later.'},...
+                        'Units','normalized')
+                    while 1==1
+                        pause
+                    end
+                end
+            end
+
+            set(htextCalibStatus,'Visible','on','String',sprintf('Done. Applied eqn. to core %s',core4calibEqn{1}))
+
+            set(calibCurveSendChooseCoreIn,'String','Enter core name here');
+
+        else
+            set(htextCalibStatus,'Visible','on','String',sprintf('Invalid core name'))
+        end
+
+        set(calibCurveSendIn,'Enable','on')
+        set(calibCurveSendDoneIn,'Enable','on')
+
+    end
+
+calibCurveSendIn = uicontrol(UserFig,'Style','pushbutton',...
+    'String',{'Add calibration';'equation to directory'},'Visible','off',...
+    'Position',[880,150,200,60],'Units','normalized','BackgroundColor',[175, 245, 220]./255,'FontSize',12,'FontName','Arial','Callback',@densCurveSend);
+
+calibCurveSendDoneIn = uicontrol(UserFig,'Style','pushbutton',...
+    'String',{'Done'},'Visible','off',...
+    'Position',[880,80,200,30],'Units','normalized','BackgroundColor',[175, 245, 220]./255,'FontSize',12,'FontName','Arial','Callback',@densCurveSendDone);
+
+calibCurveSendChooseCoreIn = uicontrol(UserFig,'Style','Edit',...
+    'String',{'Enter core name here'},'Visible','off',...
+    'Position',[660,160,180,40],'Units','normalized','BackgroundColor','white','FontSize',10,'FontName','Arial','Callback',@densCurveSendChooseCore);
+
+calibCurveCreateIn = uicontrol(UserFig,'Style','pushbutton',...
+    'String',{'Process density';'calibration curve'},'Visible','off',...
+    'Position',[660,250,140,60],'Units','normalized','BackgroundColor',[175, 245, 220]./255,'FontSize',12,'FontName','Arial','Callback',@densCurveMake);
+
+calibCurveIn = uicontrol(UserFig,'Style','pushbutton',...
+    'String',{'Make CT density';'calibration curve'},'Visible','off',...
+    'Position',[340,730,140,60],'Units','normalized','BackgroundColor',[175, 245, 220]./255,'FontSize',12,'FontName','Arial','Callback',@densCurve);
+
+lblStderror = uicontrol(UserFig,'Style','text','String','Error finding standards','Visible','off',...
+    'Position',[680,610,160,25],'Units','normalized','BackgroundColor','none','ForegroundColor',themeColor3,'FontSize',11,'FontName','Arial');
+
+    function densCurve(src,event)
+
+        set(mainMenuIn,'Visible','on')
+        % Turn visibility off for all the core-selection drop-down menus
+        set(startIn,'Visible','off')
+        set(htextLocked,'Visible','off')
+        set(regionIn,'Visible','off')
+        set(subRegionIn,'Visible','off')
+        set(coreIn,'Visible','off')
+        set(UserSetIn,'Visible','off')
+        set(startIn,'Visible','off')
+        set(previewIn,'Visible','off')
+        set(htextUser,'Visible','off')
+        if strcmp(CoralCTformat,'mchips') || strcmp(CoralCTformat,'windows')
+            set(saveLogin, 'Visible','off')
+            set(userProfileIn,'Visible','off')
+            set(coreDirIn,'Visible','off')
+        end
+        set(htextSave,'Visible','off')
+        set(saveDataIn,'Visible','off')
+        try
+            set(sectionIn,'Visible','off')
+        catch
+        end
+        set(openLastIn,'Visible','off')
+        set(htextsubRegion,'Visible','off')
+        set(htextCore,'Visible','off')
+        set(htextSection,'Visible','off')
+        set(htextRegion,'Visible','off')
+        set(coreIn,'Visible','off')
+        set(openChooseIn, 'Visible','off')
+        set(fileSizePreview,'Visible','off')
+        set(checkSpeedIn,'Visible','off')
+        set(dataModeLabel,'Visible','off');
+        set(getDataIn,'Visible','off')
+        set(downloadTimePreview,'Visible','off')
+        set(SubmitDataIn,'Visible','off')
+        set(calibCurveIn,'Visible','off')
+        %uistack(uiAbout3,'top')
+        set(htextLink4,'Visible','on')
+
+        set(h_map_cover,'Visible','on','Color',themeColor2,'xcolor',themeColor2,'ycolor',themeColor2);
+        patch(h_map_cover,[0,1],[0,1],[1 1 1],'EdgeColor','none')
+
+        try close(cache2)
+        catch
+        end
+        try cache2 = sftp(ftp_ip2,ftp_user2,"Password",ftp_password); %
+            cd(cache2,'/hd1/standards/')
+            dirStd = dir(cache2);
+            stdGroups = {'';''};
+            for jj = 1:length(dirStd)
+                stdGroups{jj} = dirStd(jj).name;
+            end
+            set(standardGroupIn,'String',stdGroups)
+            set(standardGroupIn,'Visible','on')
+            set(htextStandardGroup,'Visible','on')
+        catch
+            set(lblStderror,'Visible','on')
+        end
+
+    end
+
 sortColumn  = 12;
 ascendDescend = 'descend';
 observer_num = [];
@@ -1304,6 +1958,7 @@ coreDirIn = uicontrol(UserFig,'Style','pushbutton',...
             'ForegroundColor','k');
 
         if strcmp(CoralCTformat,'mchips') || strcmp(CoralCTformat,'windows')
+            set(saveLogin, 'Visible','off')
             set(userProfileIn,'Visible','off')
             set(coreDirIn,'Visible','off')
         end
@@ -1349,6 +2004,7 @@ coreDirIn = uicontrol(UserFig,'Style','pushbutton',...
         set(getDataIn,'Visible','off')
         set(downloadTimePreview,'Visible','off')
         set(SubmitDataIn,'Visible','off')
+        set(calibCurveIn,'Visible','off')
 
         set(h_map_cover,'Visible','on');
 
@@ -1359,7 +2015,42 @@ coreDirIn = uicontrol(UserFig,'Style','pushbutton',...
         try mget(cache1,'coral_directory_citations.txt',fullfile(selpath,'my_corals'));
             citationDir = importdata(fullfile(selpath,'my_corals','coral_directory_citations.txt'));
         catch
-            cache1 = ftp(ftp_ip1,ftp_user1,ftp_password); % make sure we can connect to FTP server 1
+            try
+                cache1 = sftp(ftp_ip1,ftp_user1,"Password",ftp_password);
+            catch
+                try
+                    connectTimes = [1,2,3,5,10,60,60*12]; % minutes
+                    connectionEstablished = 0;
+                    for ij = 1:length(connectTimes)
+                        if connectionEstablished == 0
+                            if connectTimes(ij) == 1
+                                waitText = [' ',num2str(connectTimes(ij)),' minute.']
+                            else
+                                waitText = [' ',num2str(connectTimes(ij)),' minutes.']
+                            end
+                            set(lblLoadingDir,'Units','Pixels','Visible','on',...
+                                'String',{'Error connecting to server.';strcat('Trying again in',waitText)})
+                            pause(connectTimes(ij)*60)
+                            try
+                                cache1 = sftp(ftp_ip1,ftp_user1,"Password",ftp_password);
+                                connectionEstablished = 1;
+                                set(lblLoadingDir,'Visible','off')
+                            catch
+                            end
+                        end
+                    end
+                    if connectionEstablished == 0
+                        zz = abjfl; % if we made it through end of loop, cause an error to display error code below
+                    end
+                catch
+                    set(lblLoadingDir,'Visible','on',...
+                        'String',{'Error connecting to server. (code 026)';'Please try again later.'})
+                    while 1==1
+                        pause
+                    end
+                end
+            end
+            
             cd(cache1,'/CoralCache');
             mget(cache1,'coral_directory_citations.txt',fullfile(selpath,'my_corals'));
             close(cache1);
@@ -1391,7 +2082,7 @@ coreDirIn = uicontrol(UserFig,'Style','pushbutton',...
       
         try mget(cache1,'log.csv',strcat(refPath));
         catch
-            cache1 = ftp(ftp_ip1,ftp_user1,ftp_password); % make sure we can connect to FTP server 1
+            cache1 = sftp(ftp_ip1,ftp_user1,"Password",ftp_password); % make sure we can connect to sftp server 1
             cd(cache1,'/CoralCache');
             mget(cache1,'log.csv',strcat(refPath));
             close(cache1);
@@ -1569,7 +2260,7 @@ lblGracious = [];
             rand_vidCT = round(rand(1)*(n_loading_vidsCT-1))+1;
             dispVidCT.HTMLSource = (fullfile('loading_movies',strcat('ct_movie',num2str(rand_vidCT),'.html')));
 
-            lblGracious = uicontrol(UserFig,'Style','text','String',{'CoralCache depends on your data!';'Thank you for considering sharing your data for this community effort.'},...
+            lblGracious = uicontrol(UserFig,'Style','text','String',{'CoralCache depends on your data!';'Thank you for sharing your data for this community effort.'},...
                 'Position',[100,680,500,45],'Units','normalized','FontSize',12,'FontName','Fanta','Visible','on',...
                 'BackgroundColor','w');
 
@@ -1586,6 +2277,7 @@ lblGracious = [];
         set(lblOverwrite,'Visible','off')
         set(lblUploadError,'Visible','off')
         set(lblUploadError2,'Visible','off')
+        %set(directSubmit0In,'Visible','on') %ZZ turn back on for direct submission
 
         % Turn visibility off for all the core-selection drop-down menus
         set(startIn,'Visible','off')
@@ -1598,6 +2290,7 @@ lblGracious = [];
         set(previewIn,'Visible','off')
         set(htextUser,'Visible','off')
         if strcmp(CoralCTformat,'mchips') || strcmp(CoralCTformat,'windows')
+            set(saveLogin, 'Visible','off')
             set(userProfileIn,'Visible','off')
             set(coreDirIn,'Visible','off')
         end
@@ -1620,6 +2313,7 @@ lblGracious = [];
         set(getDataIn,'Visible','off')
         set(downloadTimePreview,'Visible','off')
         set(SubmitDataIn,'Visible','off')
+        set(calibCurveIn,'Visible','off')
         set(uiAbout3,'Visible','on')
         set(uiAboutCancel3,'Visible','off')
         %uistack(uiAbout3,'top')
@@ -1637,6 +2331,41 @@ editDataIn = uicontrol(UserFig,'Style','pushbutton',...
 editDataCancelIn = uicontrol(UserFig,'Style','pushbutton',...
     'String',{'Go back'},'Visible','off',...
     'Position',[715,120,250,50],'Units','normalized','BackgroundColor',[0.78,0.94,0.54],'FontSize',14,'FontName','Arial','Callback',@editDataCancel);
+
+directSubmit0In = uicontrol(UserFig,'Style','pushbutton',...
+    'String',{'Direct submission'},'Visible','off',...
+    'Position',[715,40,250,50],'Units','normalized','BackgroundColor',[1.0, 0.78, 0.27],'FontSize',14,'FontName','Arial','Callback',@directSubmit0);
+
+directSubmitIn = uicontrol(UserFig,'Style','pushbutton',...
+    'String',{'Yes, I read about this';'in the user guide.'},'Visible','off',...
+    'Position',[715,340,250,50],'Units','normalized','BackgroundColor',[1.0, 0.78, 0.27],'FontSize',12,'FontName','Arial','Callback',@directSubmit);
+
+htextLinkUserGuide = uihyperlink(UserFig,'URL','https://www.sclerochronologylab.com/uploads/1/3/0/8/130817513/coralct-userguide.pdf','Text','Go to user guide',...
+        'FontSize',14,'FontName','Arial','Visible','off','Position',[715,280,250,30]);
+
+directSubmitGoIn = uicontrol(UserFig,'Style','pushbutton',...
+    'String',{'Submit!'},'Visible','off','Enable','off',...
+    'Position',[715,280,250,50],'Units','normalized','BackgroundColor',[1.0, 0.78, 0.27],'FontSize',12,'FontName','Arial','Callback',@directSubmitGo);
+
+directSubmitMetaIn = uicontrol(UserFig,'Style','pushbutton',...
+    'String',{'Select completed metadata';'template file'},'Visible','off',...
+    'Position',[715,360,250,50],'Units','normalized','BackgroundColor',[1.0, 0.78, 0.27],'FontSize',12,'FontName','Arial','Callback',@directSubmitMeta);
+
+directSubmitDataIn = uicontrol(UserFig,'Style','pushbutton',...
+    'String',{'Select CT scan or X-ray'},'Visible','off',...
+    'Position',[715,440,250,50],'Units','normalized','BackgroundColor',[1.0, 0.78, 0.27],'FontSize',12,'FontName','Arial','Callback',@directSubmitData);
+
+makeMapIn0 = uicontrol(UserFig,'Style','pushbutton',...
+    'String',{'Make a map'},'Visible','off',...
+    'Position',[715,200,250,50],'Units','normalized','BackgroundColor',[0.67, 0.67, 0.78],'FontSize',12,'FontName','Arial','Callback',@makeMap0);
+
+makeMapIn = uicontrol(UserFig,'Style','pushbutton',...
+    'String',{'Send request'},'Visible','off',...
+    'Position',[715,280,250,50],'Units','normalized','BackgroundColor',[0.67, 0.67, 0.78],'FontSize',12,'FontName','Arial','Callback',@makeMap);
+
+mapCancelIn = uicontrol(UserFig,'Style','pushbutton',...
+    'String',{'Go back'},'Visible','off',...
+    'Position',[715,120,250,50],'Units','normalized','BackgroundColor',[0.78,0.94,0.54],'FontSize',14,'FontName','Arial','Callback',@mapCancel);
 
 sendDataIn = uicontrol(UserFig,'Style','pushbutton',...
     'String',{'Submit data folder'},'Visible','off',...
@@ -1662,7 +2391,7 @@ sendVideoIn = uicontrol(UserFig,'Style','pushbutton',...
     'String',{'Submit a fieldwork video';'for loading screens'},'Visible','off',...
     'Position',[715,200,250,50],'Units','normalized','BackgroundColor',[0.99, 0.54, 0.19],'FontSize',12,'FontName','Arial','Callback',@sendVideoFile);
 
-lblThanksCT = uicontrol(UserFig,'Style','text','String','Thank you for sending your CT data!','Position',[690,30,300,20],...
+lblThanksCT = uicontrol(UserFig,'Style','text','String','Thank you for sending your CT data!','Position',[690,30,300,40],...
     'BackgroundColor','none','FontSize',10,'FontName','Arial','Units','normalized','Visible','off');
 
 lblThanksMeta = uicontrol(UserFig,'Style','text','String','Thank you for sending your metadata!','Position',[690,30,300,20],...
@@ -1681,13 +2410,29 @@ convertTifIn = uicontrol(UserFig,'Style','pushbutton',...
     'String',{'Convert Tifs: choose a folder containing .tif files'},'Visible','off',...
     'Position',[715,600,300,60],'Units','normalized','BackgroundColor',[0.58,0.93,0.78],'FontSize',10,'FontName','Arial','Callback',@convertTif);
 
+resizeDicomsIn = uicontrol(UserFig,'Style','pushbutton',...
+    'String',{'Resize DICOMS: choose a folder containing a';'subfolder with .dcm files'},'Visible','off',...
+    'Position',[715,480,300,60],'Units','normalized','BackgroundColor',[0.58,0.93,0.78],'FontSize',10,'FontName','Arial','Callback',@resizeDicoms);
+
 rotateDicomsIn = uicontrol(UserFig,'Style','pushbutton',...
     'String',{'Rotate DICOMS: choose a folder containing a';'subfolder with .dcm files'},'Visible','off',...
     'Position',[715,360,300,60],'Units','normalized','BackgroundColor',[0.58,0.93,0.78],'FontSize',10,'FontName','Arial','Callback',@rotateDicoms);
 
-resizeDicomsIn = uicontrol(UserFig,'Style','pushbutton',...
-    'String',{'Resize DICOMS: choose a folder containing a';'subfolder with .dcm files'},'Visible','off',...
-    'Position',[715,480,300,60],'Units','normalized','BackgroundColor',[0.58,0.93,0.78],'FontSize',10,'FontName','Arial','Callback',@resizeDicoms);
+cropDicomsIn0 = uicontrol(UserFig,'Style','pushbutton',...
+    'String',{'Crop DICOMS: choose a folder containing a';'subfolder with .dcm files'},'Visible','off',...
+    'Position',[715,240,300,60],'Units','normalized','BackgroundColor',[0.58,0.93,0.78],'FontSize',10,'FontName','Arial','Callback',@cropDicoms0);
+
+cropDicomsInAxial = uicontrol(UserFig,'Style','pushbutton',...
+    'String',{'Crop from axial view'},'Visible','off',...
+    'Position',[715,480,300,60],'Units','normalized','BackgroundColor',[0.58,0.93,0.78],'FontSize',10,'FontName','Arial','Callback',@cropDicomsAxial);
+
+cropDicomsInSagittal = uicontrol(UserFig,'Style','pushbutton',...
+    'String',{'Crop from sagittal view'},'Visible','off',...
+    'Position',[715,360,300,60],'Units','normalized','BackgroundColor',[0.58,0.93,0.78],'FontSize',10,'FontName','Arial','Callback',@cropDicomsSagittal);
+
+cropDicomsInCoronal = uicontrol(UserFig,'Style','pushbutton',...
+    'String',{'Crop from coronal view'},'Visible','off',...
+    'Position',[715,240,300,60],'Units','normalized','BackgroundColor',[0.58,0.93,0.78],'FontSize',10,'FontName','Arial','Callback',@cropDicomsCoronal);
 
 uiAbout3 = uicontrol(UserFig,'Style','pushbutton',...
     'String',{'Help'},'Visible','off',...
@@ -1697,11 +2442,348 @@ uiAboutCancel3 = uicontrol(UserFig,'Style','pushbutton',...
     'String',{'Done with help'},'Visible','off',...
     'Position',[225,10,150,25],'Units','normalized','FontSize',11,'FontName','Arial','Callback',@about3Cancel_callback);
 
-htextLink4 = uihyperlink(UserFig,'URL','www.coralct.org','Text','www.coralct.org',...
+htextLink4 = uihyperlink(UserFig,'URL','https://www.sclerochronologylab.com/coralct.html','Text','www.coralct.org',...
         'FontSize',14,'FontName','Arial','Visible','off','Position',[575,10,120,25]);
 
 htextAbout3 = uicontrol(UserFig,'Style','text','String',' ',...
     'Position',[50,200,400,400],'Units','normalized','FontSize',10,'FontName','Arial','Visible','off','BackgroundColor','w');
+
+selpath4 = [];
+function cropDicoms0(src,event)
+    set(UserFig,'Visible','off')
+    pause(0.001)
+    selpath4 = uigetdir;
+    set(UserFig,'Visible','on')
+
+    set(resizeDicomsIn,'Visible','off')
+    set(rotateDicomsIn,'Visible','off')
+    set(convertTifIn,'Visible','off')
+    set(cropDicomsIn0,'Visible','off')
+    set(cropDicomsInAxial,'Visible','on')
+    set(cropDicomsInSagittal,'Visible','on')
+    set(cropDicomsInCoronal,'Visible','on')
+
+end
+
+cropFig = [];
+
+    function cropDicomsAxial(src,event)
+
+        set(cropDicomsInCoronal,'Enable','off')
+        set(cropDicomsInSagittal,'Enable','off')
+        set(cropDicomsInAxial,'Enable','off')
+        set(editDataCancelIn,'Enable','off')
+        set(uiAbout3,'Enable','off')
+
+        folder_name = 'cropped';
+        mkdir(fullfile(selpath4,folder_name));
+
+        fileOpen = selpath4;
+
+        resizeFactor = 1;
+
+        ha3 = uiaxes(UserFig,'Units','Pixels','Position',[715,40,250,60],'Units','normalized','Visible','on');
+        ha3.InteractionOptions.DatatipsSupported = 'off';
+        ha3.InteractionOptions.ZoomSupported = "off";
+        ha3.InteractionOptions.PanSupported = "off";
+        ha3.Toolbar.Visible = 'off';
+        hold(ha3,'on')
+        set(ha3,'Xtick',[],'YTick',[],'XLim',[0 1],'YLim',[0 1])
+        %processNumber = processNumber + 1;
+        titleName = 'loading CT data';
+        [sliceLoc,metadata] = loadDataResize(resizeFactor);
+        delete(p1)
+        delete(ha3)
+        ha3 = uiaxes(UserFig,'Units','Pixels','Position',[715,40,250,60],'Units','normalized','Visible','on');
+        ha3.InteractionOptions.DatatipsSupported = 'off';
+        ha3.InteractionOptions.ZoomSupported = "off";
+        ha3.InteractionOptions.PanSupported = "off";
+        ha3.Toolbar.Visible = 'off';
+        hold(ha3,'on')
+        set(ha3,'Xtick',[],'YTick',[],'XLim',[0 1],'YLim',[0 1])
+
+        cropFig = uifigure('Visible','off','Position',[50,100,800,800],'Color','k');
+        haCrop = uiaxes(cropFig,'Units','Pixels','Position',[50,50,600,600],'Units','normalized','Color','none','xcolor','k','ycolor','k');
+        cropPlot = pcolor(haCrop,1:size(X,1),1:size(X,2),max(X,[],3));
+        set(cropPlot,'EdgeColor','none')
+        set(cropPlot,'EdgeColor','interp')
+        set(haCrop,'PlotBoxAspectRatio',[1 1 1])
+        set(haCrop,'DataAspectRatio',[1 1 1])
+        set(haCrop,'Colormap',colormap('bone'))
+        set(cropFig,'Visible','on')
+
+        roi = drawrectangle(haCrop);
+
+        rows_keep = round([roi.Position(2), roi.Position(2)+roi.Position(4)]);
+        cols_keep = round([roi.Position(1), roi.Position(1)+roi.Position(3)]);
+
+        if rows_keep(1)<1
+            rows_keep(1) = 1;
+        end
+        if rows_keep(2)>length(X(:,1,1))
+            rows_keep(2) = length(X(:,1,1));
+        end
+        if cols_keep(1)<1
+            cols_keep(1) = 1;
+        end
+        if cols_keep(2)>length(X(1,:,1))
+            cols_keep(2) = length(X(1,:,1));
+        end
+
+        close(cropFig)
+
+        %uiwait(UserFig)
+
+        thisUID = dicomuid;
+
+        %processNumber = processNumber;
+        titleName = 'Cropping data';
+        for a = 1:layers
+            thisMeta = metadata;
+            %thisMeta.Width = col;
+            %thisMeta.Height = row;
+            thisMeta.Width = length(cols_keep(1):cols_keep(2));
+            thisMeta.Height = length(rows_keep(1):rows_keep(2));
+            thisMeta.SliceLocation = sliceLoc(a);
+            thisMeta.ImagePositionPatient(3) = sliceLoc(a);
+            thisMeta.SliceThickness = pxS;
+            thisMeta.SliceInterval = pxS;
+            thisMeta.SpacingBetweenSlices = pxS;
+            thisMeta.PixelSpacing = [hpxS;hpxS];
+            thisMeta.SeriesInstanceUID = thisUID;
+            padNum = 5-numel(num2str(a));
+            pad = [];
+            for a2 = 1:padNum
+                pad = [pad,'0'];
+            end
+            dicomwrite(uint16((X(rows_keep(1):rows_keep(2),cols_keep(1):cols_keep(2),a)-metadata.RescaleIntercept)/metadata.RescaleSlope),fullfile(selpath4,folder_name,strcat(pad,num2str(a),'.dcm')),thisMeta);
+            progressUpdate(a/layers)
+        end
+
+        delete(p1)
+        delete(ha3)
+
+        set(cropDicomsInCoronal,'Enable','on')
+        set(cropDicomsInSagittal,'Enable','on')
+        set(cropDicomsInAxial,'Enable','on')
+        set(editDataCancelIn,'Enable','on')
+        set(uiAbout3,'Enable','on')
+
+        editDataCancel
+
+    end
+
+    function cropDicomsSagittal(src,event)
+
+        set(cropDicomsInCoronal,'Enable','off')
+        set(cropDicomsInSagittal,'Enable','off')
+        set(cropDicomsInAxial,'Enable','off')
+        set(editDataCancelIn,'Enable','off')
+        set(uiAbout3,'Enable','off')
+
+        folder_name = 'cropped';
+        mkdir(fullfile(selpath4,folder_name));
+
+        fileOpen = selpath4;
+
+        resizeFactor = 1;
+
+        ha3 = uiaxes(UserFig,'Units','Pixels','Position',[715,40,250,60],'Units','normalized','Visible','on');
+        ha3.InteractionOptions.DatatipsSupported = 'off';
+        ha3.InteractionOptions.ZoomSupported = "off";
+        ha3.InteractionOptions.PanSupported = "off";
+        ha3.Toolbar.Visible = 'off';
+        hold(ha3,'on')
+        set(ha3,'Xtick',[],'YTick',[],'XLim',[0 1],'YLim',[0 1])
+        %processNumber = processNumber + 1;
+        titleName = 'loading CT data';
+        [sliceLoc,metadata] = loadDataResize(resizeFactor);
+        delete(p1)
+        delete(ha3)
+        ha3 = uiaxes(UserFig,'Units','Pixels','Position',[715,40,250,60],'Units','normalized','Visible','on');
+        ha3.InteractionOptions.DatatipsSupported = 'off';
+        ha3.InteractionOptions.ZoomSupported = "off";
+        ha3.InteractionOptions.PanSupported = "off";
+        ha3.Toolbar.Visible = 'off';
+        hold(ha3,'on')
+        set(ha3,'Xtick',[],'YTick',[],'XLim',[0 1],'YLim',[0 1])
+
+        cropFig = uifigure('Visible','off','Position',[50,100,800,800],'Color','k');
+        haCrop = uiaxes(cropFig,'Units','Pixels','Position',[50,50,600,600],'Units','normalized','Color','none','xcolor','k','ycolor','k');
+        cropPlot = pcolor(haCrop,1:size(X,1),1:size(X,3),squeeze(max(X,[],2))');
+        set(cropPlot,'EdgeColor','none')
+        set(cropPlot,'EdgeColor','interp')
+        set(haCrop,'PlotBoxAspectRatio',[1 1 1])
+        set(haCrop,'DataAspectRatio',[pxS hpxS hpxS]./max([pxS,hpxS]))
+        set(haCrop,'Colormap',colormap('bone'))
+        set(cropFig,'Visible','on')
+
+        roi = drawrectangle(haCrop);
+
+        rows_keep = round([roi.Position(2), roi.Position(2)+roi.Position(4)]);
+        cols_keep = round([roi.Position(1), roi.Position(1)+roi.Position(3)]);
+
+        if rows_keep(1)<1
+            rows_keep(1) = 1;
+        end
+        if rows_keep(2)>length(X(1,1,:))
+            rows_keep(2) = length(X(1,1,:));
+        end
+        if cols_keep(1)<1
+            cols_keep(1) = 1;
+        end
+        if cols_keep(2)>length(X(:,1,1))
+            cols_keep(2) = length(X(:,1,1));
+        end
+
+        close(cropFig)
+
+        %uiwait(UserFig)
+
+        thisUID = dicomuid;
+
+        %processNumber = processNumber;
+        titleName = 'Cropping data';
+        for a = rows_keep(1):rows_keep(2)
+            thisMeta = metadata;
+            %thisMeta.Width = col;
+            %thisMeta.Height = row;
+            thisMeta.Width = length(cols_keep(1):cols_keep(2));
+            thisMeta.Height = row;
+            thisMeta.SliceLocation = sliceLoc(a);
+            thisMeta.ImagePositionPatient(3) = sliceLoc(a);
+            thisMeta.SliceThickness = pxS;
+            thisMeta.SliceInterval = pxS;
+            thisMeta.SpacingBetweenSlices = pxS;
+            thisMeta.PixelSpacing = [hpxS;hpxS];
+            thisMeta.SeriesInstanceUID = thisUID;
+            padNum = 5-numel(num2str(a));
+            pad = [];
+            for a2 = 1:padNum
+                pad = [pad,'0'];
+            end
+            dicomwrite(uint16((X(:,cols_keep(1):cols_keep(2),a)-metadata.RescaleIntercept)/metadata.RescaleSlope),fullfile(selpath4,folder_name,strcat(pad,num2str(a),'.dcm')),thisMeta);
+            progressUpdate(a/rows_keep(2))
+        end
+
+        delete(p1)
+        delete(ha3)
+
+        set(cropDicomsInCoronal,'Enable','on')
+        set(cropDicomsInSagittal,'Enable','on')
+        set(cropDicomsInAxial,'Enable','on')
+        set(editDataCancelIn,'Enable','on')
+        set(uiAbout3,'Enable','on')
+
+        editDataCancel
+
+    end
+
+    function cropDicomsCoronal(src,event)
+        
+        set(cropDicomsInCoronal,'Enable','off')
+        set(cropDicomsInSagittal,'Enable','off')
+        set(cropDicomsInAxial,'Enable','off')
+        set(editDataCancelIn,'Enable','off')
+        set(uiAbout3,'Enable','off')
+
+        folder_name = 'cropped';
+        mkdir(fullfile(selpath4,folder_name));
+
+        fileOpen = selpath4;
+
+        resizeFactor = 1;
+
+        ha3 = uiaxes(UserFig,'Units','Pixels','Position',[715,40,250,60],'Units','normalized','Visible','on');
+        ha3.InteractionOptions.DatatipsSupported = 'off';
+        ha3.InteractionOptions.ZoomSupported = "off";
+        ha3.InteractionOptions.PanSupported = "off";
+        ha3.Toolbar.Visible = 'off';
+        hold(ha3,'on')
+        set(ha3,'Xtick',[],'YTick',[],'XLim',[0 1],'YLim',[0 1])
+        %processNumber = processNumber + 1;
+        titleName = 'loading CT data';
+        [sliceLoc,metadata] = loadDataResize(resizeFactor);
+        delete(p1)
+        delete(ha3)
+        ha3 = uiaxes(UserFig,'Units','Pixels','Position',[715,40,250,60],'Units','normalized','Visible','on');
+        ha3.InteractionOptions.DatatipsSupported = 'off';
+        ha3.InteractionOptions.ZoomSupported = "off";
+        ha3.InteractionOptions.PanSupported = "off";
+        ha3.Toolbar.Visible = 'off';
+        hold(ha3,'on')
+        set(ha3,'Xtick',[],'YTick',[],'XLim',[0 1],'YLim',[0 1])
+
+        cropFig = uifigure('Visible','off','Position',[50,100,800,800],'Color','k');
+        haCrop = uiaxes(cropFig,'Units','Pixels','Position',[50,50,600,600],'Units','normalized','Color','none','xcolor','k','ycolor','k');
+        cropPlot = pcolor(haCrop,1:size(X,2),1:size(X,3),squeeze(max(X,[],1))');
+        set(cropPlot,'EdgeColor','none')
+        set(cropPlot,'EdgeColor','interp')
+        set(haCrop,'PlotBoxAspectRatio',[1 1 1])
+        set(haCrop,'DataAspectRatio',[pxS hpxS hpxS]./max([pxS,hpxS]))
+        set(haCrop,'Colormap',colormap('bone'))
+        set(cropFig,'Visible','on')
+
+        roi = drawrectangle(haCrop);
+
+        rows_keep = round([roi.Position(2), roi.Position(2)+roi.Position(4)]);
+        cols_keep = round([roi.Position(1), roi.Position(1)+roi.Position(3)]);
+
+        if rows_keep(1)<1
+            rows_keep(1) = 1;
+        end
+        if rows_keep(2)>length(X(1,1,:))
+            rows_keep(2) = length(X(1,1,:));
+        end
+        if cols_keep(1)<1
+            cols_keep(1) = 1;
+        end
+        if cols_keep(2)>length(X(1,:,1))
+            cols_keep(2) = length(X(1,:,1));
+        end
+
+        close(cropFig)
+
+        %uiwait(UserFig)
+
+        thisUID = dicomuid;
+
+        %processNumber = processNumber;
+        titleName = 'Cropping data';
+        for a = rows_keep(1):rows_keep(2)
+            thisMeta = metadata;
+            %thisMeta.Width = col;
+            %thisMeta.Height = row;
+            thisMeta.Width = length(cols_keep(1):cols_keep(2));
+            thisMeta.Height = col;
+            thisMeta.SliceLocation = sliceLoc(a);
+            thisMeta.ImagePositionPatient(3) = sliceLoc(a);
+            thisMeta.SliceThickness = pxS;
+            thisMeta.SliceInterval = pxS;
+            thisMeta.SpacingBetweenSlices = pxS;
+            thisMeta.PixelSpacing = [hpxS;hpxS];
+            thisMeta.SeriesInstanceUID = thisUID;
+            padNum = 5-numel(num2str(a));
+            pad = [];
+            for a2 = 1:padNum
+                pad = [pad,'0'];
+            end
+            dicomwrite(uint16((X(:,cols_keep(1):cols_keep(2),a)-metadata.RescaleIntercept)/metadata.RescaleSlope),fullfile(selpath4,folder_name,strcat(pad,num2str(a),'.dcm')),thisMeta);
+            progressUpdate(a/rows_keep(2))
+        end
+
+        delete(p1)
+        delete(ha3)
+
+        set(cropDicomsInCoronal,'Enable','on')
+        set(cropDicomsInSagittal,'Enable','on')
+        set(cropDicomsInAxial,'Enable','on')
+        set(editDataCancelIn,'Enable','on')
+        set(uiAbout3,'Enable','on')
+
+        editDataCancel
+
+    end
 
     function about3_callback(src,event)
 
@@ -1742,6 +2824,649 @@ htextAbout3 = uicontrol(UserFig,'Style','text','String',' ',...
 
     end
 
+    function makeMap0(src,event)
+        set(makeMapIn,'Visible','on')
+        set(htextLatN,'Visible','on')
+        set(latNsetIn,'Visible','on')
+        set(htextLatS,'Visible','on')
+        set(latSsetIn,'Visible','on')
+        set(htextLonE,'Visible','on')
+        set(lonEsetIn,'Visible','on')
+        set(htextLonW,'Visible','on')
+        set(lonWsetIn,'Visible','on')
+        set(htextMapName,'Visible','on')
+        set(mapNameSetIn,'Visible','on')
+        set(directSubmitGoIn,'Visible','off')
+        set(directSubmitMetaIn,'Visible','off')
+        set(directSubmitDataIn,'Visible','off')
+        set(directSubmitIn,'Visible','off')
+        set(htextLinkUserGuide,'Visible','off')
+        set(makeMapIn0,'Visible','off')
+        set(mapCancelIn,'Visible','on')
+        set(mapResIn,'Visible','on')
+        set(htextMapRes,'Visible','on')
+        set(editDataCancelIn,'Visible','off')
+        
+    end
+
+    function mapCancel(src,event)
+        set(makeMapIn,'Visible','off')
+        set(htextLatN,'Visible','off')
+        set(latNsetIn,'Visible','off')
+        set(htextLatS,'Visible','off')
+        set(latSsetIn,'Visible','off')
+        set(htextLonE,'Visible','off')
+        set(lonEsetIn,'Visible','off')
+        set(htextLonW,'Visible','off')
+        set(lonWsetIn,'Visible','off')
+        set(htextMapName,'Visible','off')
+        set(mapNameSetIn,'Visible','off')
+        set(directSubmitGoIn,'Visible','on')
+        set(directSubmitMetaIn,'Visible','on')
+        set(directSubmitDataIn,'Visible','on')
+        set(makeMapIn0,'Visible','on')
+        set(mapCancelIn,'Visible','off')
+        set(mapResIn,'Visible','off')
+        set(htextMapRes,'Visible','off')
+        set(editDataCancelIn,'Visible','on')
+        set(coordSetError,'Visible','off')
+    end
+
+htextMapRes = uicontrol(UserFig,'Style','text','String','Map resolution:','Visible','off',...
+    'Position',[760,525,150,24],'Units','normalized','BackgroundColor','none','ForegroundColor',[0,0,0],'FontSize',12,'FontName','Arial');
+
+mapResIn = uicontrol(UserFig,'Style','popupmenu',...
+    'Position',[760,500,150,25],'Units','normalized',...
+    'String',{'Highest','High','Intermediate','Low','Lowest'},'Visible','off',...
+    'Callback',@mapRes);
+
+mapResSave = {'Highest'};
+mapResOptions = {'Highest','High','Intermediate','Low','Lowest'};
+    function mapRes(src,event)
+        mapResSave = mapResOptions(mapResIn.Value);
+    end
+
+coordSetError = uicontrol(UserFig,'Style','text','String',' ','Visible','off',...
+    'Position',[760,680,150,40],'Units','normalized','BackgroundColor','none','ForegroundColor',[0,0,0],'FontSize',12,'FontName','Arial');
+
+
+htextLonW = uicontrol(UserFig,'Style','text','String','W:','Visible','off',...
+    'Position',[720,625,15,20],'Units','normalized','BackgroundColor','none','ForegroundColor',[0,0,0],'FontSize',12,'FontName','Arial');
+
+lonWsetIn = uicontrol(UserFig,'Style','Edit','Visible','off',...
+    'Position',[740,625,60,20],'Units','normalized','Callback', @makeMapWset);
+
+mapWset = [];
+    function makeMapWset(src,event)
+        mapWset = str2num(lonWsetIn.String);
+        set(coordSetError,'Visible','off')
+        if length(mapWset) == 0
+            set(coordSetError,'String','Enter only numbers','Visible','on')
+        end
+        try
+            if mapWset >= -180 && mapWset <= 180
+            else
+                set(coordSetError,'String',{'Longitude must be';'within -180 to 180'},'Visible','on')
+            end
+        catch
+        end
+    end
+
+htextLatN = uicontrol(UserFig,'Style','text','String','N:','Visible','off',...
+    'Position',[800,650,15,20],'Units','normalized','BackgroundColor','none','ForegroundColor',[0,0,0],'FontSize',12,'FontName','Arial');
+
+latNsetIn = uicontrol(UserFig,'Style','Edit','Visible','off',...
+    'Position',[820,650,60,20],'Units','normalized','Callback', @makeMapNset);
+
+mapNset = [];
+    function makeMapNset(src,event)
+        mapNset = str2num(latNsetIn.String);
+        set(coordSetError,'Visible','off')
+        if length(mapNset) == 0
+            set(coordSetError,'String','Enter only numbers','Visible','on')
+        end
+        try
+            if mapNset >= -90 && mapNset <= 90
+            else
+                set(coordSetError,'String',{'Latitude must be';'within -90 to 90'},'Visible','on')
+            end
+        catch
+        end
+    end
+
+htextLatS = uicontrol(UserFig,'Style','text','String','S:','Visible','off',...
+    'Position',[800,600,15,20],'Units','normalized','BackgroundColor','none','ForegroundColor',[0,0,0],'FontSize',12,'FontName','Arial');
+
+latSsetIn = uicontrol(UserFig,'Style','Edit','Visible','off',...
+    'Position',[820,600,60,20],'Units','normalized','Callback', @makeMapSset);
+
+mapSset = [];
+    function makeMapSset(src,event)
+        mapSset = str2num(latSsetIn.String);
+        set(coordSetError,'Visible','off')
+        if length(mapSset) == 0
+            set(coordSetError,'String','Enter only numbers','Visible','on')
+        end
+        try
+            if mapSset >= -90 && mapSset <= 90
+            else
+                set(coordSetError,'String',{'Latitude must be';'within -90 to 90'},'Visible','on')
+            end
+        catch
+        end
+    end
+
+htextLonE = uicontrol(UserFig,'Style','text','String','E:','Visible','off',...
+    'Position',[880,625,15,20],'Units','normalized','BackgroundColor','none','ForegroundColor',[0,0,0],'FontSize',12,'FontName','Arial');
+
+lonEsetIn = uicontrol(UserFig,'Style','Edit','Visible','off',...
+    'Position',[900,625,60,20],'Units','normalized','Callback', @makeMapEset);
+
+mapEset = [];
+    function makeMapEset(src,event)
+        mapEset = str2num(lonEsetIn.String);
+        set(coordSetError,'Visible','off')
+        if length(mapEset) == 0
+            set(coordSetError,'String','Enter only numbers','Visible','on')
+        end
+        try
+            if mapEset >= -180 && mapEset <= 180
+            else
+                set(coordSetError,'String',{'Longitude must be';'within -180 to 180'},'Visible','on')
+            end
+        catch
+        end
+    end
+
+htextMapName = uicontrol(UserFig,'Style','text','String','Region or subregion name:','Visible','off',...
+    'Position',[735,445,200,20],'Units','normalized','BackgroundColor','none','ForegroundColor',[0,0,0],'FontSize',12,'FontName','Arial');
+
+mapNameSetIn = uicontrol(UserFig,'Style','Edit','Visible','off',...
+    'Position',[735,420,200,20],'Units','normalized','Callback', @mapNameSet);
+
+mapName = ' ';
+    function mapNameSet(src,event)
+        mapName = mapNameSetIn.String;
+    end
+
+    function makeMap(src,event)
+
+        set(makeMapIn,'Enable','off')
+
+        try
+
+        if max(strcmp(mapResSave,mapResOptions))<1
+            set(coordSetError,'String',{'Please choose a resolution'},'Visible','on')
+            set(makeMapIn,'Enable','on')
+        elseif mapWset < -180 || mapWset > 180 || mapEset < -180 || mapEset > 180
+            set(coordSetError,'String',{'Longitude must be';'within -180 to 180'},'Visible','on')
+            set(makeMapIn,'Enable','on')
+        elseif mapNset < -90 || mapNset > 90 || mapSset < -90 || mapSset > 90
+            set(coordSetError,'String',{'Latitude must be';'within -90 to 90'},'Visible','on')
+            set(makeMapIn,'Enable','on')
+        elseif mapNset <= mapSset
+            set(coordSetError,'String',{'N value must be';'greater than S value'},'Visible','on')
+            set(makeMapIn,'Enable','on')
+        elseif mapEset <= mapWset
+            set(coordSetError,'String',{'E value must be';'greater than W value'},'Visible','on')
+            set(makeMapIn,'Enable','on')
+        else
+            set(coordSetError,'Visible','off')
+            C = {mapResSave{1}, string(num2str(mapNset)), string(num2str(mapSset)), string(num2str(mapEset)), string(num2str(mapWset)), mapName, saveFileName};
+            fid = fopen(fullfile(refPath,strcat('map_request_',num2str(mapNset), num2str(mapSset), num2str(mapEset), num2str(mapWset),'.csv')));
+            writecell(C,fullfile(refPath,strcat('map_request_',num2str(mapNset), num2str(mapSset), num2str(mapEset), num2str(mapWset),'.csv')));
+            try fclose(fid);
+            catch
+            end
+
+            % connect
+            try
+                cache3 = sftp(ftp_ip1,ftp_user1,"Password",ftp_password);
+                cd(cache3,'CoralCache/submitted_maps')
+                mput(cache3,fullfile(refPath,strcat('map_request_',num2str(mapNset), num2str(mapSset), num2str(mapEset), num2str(mapWset),'.csv')))
+                delete(fullfile(refPath,strcat('map_request_',num2str(mapNset), num2str(mapSset), num2str(mapEset), num2str(mapWset),'.csv')))
+                close(cache3)
+            catch
+                try
+                    connectTimes = [1,2,3,5,10,60,60*12]; % minutes
+                    connectionEstablished = 0;
+                    for ij = 1:length(connectTimes)
+                        if connectionEstablished == 0
+                            if connectTimes(ij) == 1
+                                waitText = [' ',num2str(connectTimes(ij)),' minute.']
+                            else
+                                waitText = [' ',num2str(connectTimes(ij)),' minutes.']
+                            end
+                            set(lblSendingDirect,'Units','Pixels','Visible','on',...
+                                'String',{'Error connecting to server.';strcat('Trying again in',waitText)})
+                            pause(connectTimes(ij)*60)
+                            try
+                                cache3 = sftp(ftp_ip1,ftp_user1,"Password",ftp_password);
+                                cd(cache3,'CoralCache/submitted_maps')
+                                mput(cache3,fullfile(refPath,strcat('map_request_',num2str(mapNset), num2str(mapSset), num2str(mapEset), num2str(mapWset),'.csv')))
+                                delete(fullfile(refPath,strcat('map_request_',num2str(mapNset), num2str(mapSset), num2str(mapEset), num2str(mapWset),'.csv')))
+                                close(cache3)
+                                connectionEstablished = 1;
+                                set(lblSendingDirect,'String','Sending data...')
+                            catch
+                            end
+                        end
+                    end
+                    if connectionEstablished == 0
+                        zz = abjfl; % if we made it through end of loop, cause an error to display error code below
+                    end
+                catch
+                    set(lblSendingDirect,'Visible','on',...
+                        'String',{'Error connecting to server. (code 040)';'Please try again later.'})
+                    while 1==1
+                        pause
+                    end
+                end
+            end
+            set(coordSetError,'String',{'Submission successful'},'Visible','on')
+            set(lonEsetIn,'String','')
+            set(lonWsetIn,'String','')
+            set(latNsetIn,'String','')
+            set(latSsetIn,'String','')
+            set(mapNameSetIn,'String','')
+            set(makeMapIn,'Enable','on')
+            pause(10)
+            set(coordSetError,'Visible','off')
+            
+        end
+
+        catch
+            set(coordSetError,'String',{'Request unsuccessful';'please try again'},'Visible','on')
+            set(makeMapIn,'Enable','on')
+        end
+
+
+    end
+
+
+    function directSubmit0(src,event)
+
+        set(sendDataIn,'Visible','off')
+        set(editDataIn,'Visible','off')
+        set(sendDataFileIn,'Visible','off')
+        set(sendXrayIn,'Visible','off')
+        set(getMetaDataIn,'Visible','off')
+        set(sendMetaDataIn,'Visible','off')
+        set(sendVideoIn,'Visible','off')
+        set(mainMenuIn,'Visible','off')
+        set(lblThanksCT,'Visible','off')
+        set(lblThanksMeta,'Visible','off')
+        set(lblOverwrite,'Visible','off')
+        set(lblUploadError,'Visible','off')
+        set(lblUploadError2,'Visible','off')
+
+        set(editDataCancelIn,'Visible','on')
+        set(directSubmitIn,'Visible','on')
+        set(htextLinkUserGuide,'Visible','on')
+        set(directSubmit0In,'Visible','off')
+
+    end
+
+    function directSubmit(src,event)
+
+        set(directSubmitIn,'Visible','off')
+        set(htextLinkUserGuide,'Visible','off')
+        set(directSubmitGoIn,'Visible','on')
+        set(directSubmitDataIn,'Visible','on')
+        set(directSubmitMetaIn,'Visible','on')
+
+        set(makeMapIn0,'Visible','on')
+
+    end
+
+datafile2send = [];
+metafile2send = [];
+selpathmeta = [];
+selpathdata = [];
+haveMeta = 0;
+haveData = 0;
+
+    function directSubmitMeta(src,event)
+
+        set(UserFig,'Visible','off')
+        pause(0.001)
+
+        [metafile2send,selpathmeta] = uigetfile({'*.xlsx'},'Choose metadata');
+        set(UserFig,'Visible','on')
+
+        set(directSubmitMetaIn,'Enable','off')
+        set(makeMapIn0,'Enable','off')
+        haveMeta = 1;
+        if haveData == 1
+            set(directSubmitGoIn,'Enable','on')
+        end
+
+    end
+
+    function directSubmitData(src,event)
+
+        set(UserFig,'Visible','off')
+        pause(0.001)
+
+        [datafile2send,selpathdata] = uigetfile({'*.zip;*.tiff'},'Choose X-ray or CT scan');
+        set(UserFig,'Visible','on')
+
+        set(directSubmitDataIn,'Enable','off')
+        set(makeMapIn0,'Enable','off')
+        haveData = 1;
+        if haveMeta == 1
+            set(directSubmitGoIn,'Enable','on')
+        end
+
+    end
+
+lblSendingDirect = [];
+    function directSubmitGo(src,event)
+
+        haveMeta = 0;
+        haveData = 0;
+
+        try
+
+            set(directSubmitGoIn,'Enable','off')
+            set(editDataCancelIn,'Enable','off')
+            set(uiAbout3,'Enable','off')
+
+            try delete(lblSendingDirect)
+            catch
+            end
+            lblSendingDirect = uicontrol(UserFig,'Style','text','String','Sending data...','Position',[720,80,250,40],...
+                'BackgroundColor','none','FontSize',12,'FontName','Arial','Units','normalized','Visible','on');
+
+            pause(0.1)
+            % read metadata
+            [newmeta_num,newmeta_text,raw] = xlsread(fullfile(selpathmeta,metafile2send))
+
+            successDirect = 0;
+            for jji = 1%:length(newmeta_text(:,1))-1 % only read top one
+
+                submittedCoreName = newmeta_text{jji+1,1};
+                submittedSectionName = newmeta_text{jji+1,2};
+                submittedRegionName = newmeta_text{jji+1,3};
+                submittedSubregionName = newmeta_text{jji+1,4};
+                submittedGenus = newmeta_text{jji+1,5};
+                submittedOwner = newmeta_text{jji+1,6};
+                submittedNotes = newmeta_text{jji+1,7};
+                submittedIsCT = newmeta_num(jji,12);
+
+                submittedCitation = newmeta_text{jji+1,8};
+                submittedAcknowledge = newmeta_text{jji+1,9};
+
+                if max(strcmp(submittedCoreName,coralDir.textdata(:,1))) == 1 && strcmp(submittedSectionName,'') && ~strcmp(submittedRegionName,'standards')
+                    directSubmitErrorMsg = sprintf('Core %s name already taken',submittedCoreName);
+                    set(lblSendingDirect,'String',directSubmitErrorMsg)
+                    break
+                end
+
+                if max(strcmp(submittedCoreName,coralDir.textdata(:,1))) == 1 && max(strcmp(submittedSectionName,coralDir.textdata(:,2)))
+                    directSubmitErrorMsg = sprintf('Core/section %s name already taken',submittedCoreName);
+                    set(lblSendingDirect,'String',directSubmitErrorMsg)
+                    break
+                end
+
+                % connect
+                try
+                    cache3 = sftp(ftp_ip1,ftp_user1,"Password",ftp_password);
+                catch
+                    try
+                        connectTimes = [1,2,3,5,10,60,60*12]; % minutes
+                        connectionEstablished = 0;
+                        for ij = 1:length(connectTimes)
+                            if connectionEstablished == 0
+                                if connectTimes(ij) == 1
+                                    waitText = [' ',num2str(connectTimes(ij)),' minute.']
+                                else
+                                    waitText = [' ',num2str(connectTimes(ij)),' minutes.']
+                                end
+                                set(lblSendingDirect,'Units','Pixels','Visible','on',...
+                                    'String',{'Error connecting to server.';strcat('Trying again in',waitText)})
+                                pause(connectTimes(ij)*60)
+                                try
+                                    cache3 = sftp(ftp_ip1,ftp_user1,"Password",ftp_password);
+                                    connectionEstablished = 1;
+                                    set(lblSendingDirect,'String','Sending data...')
+                                catch
+                                end
+                            end
+                        end
+                        if connectionEstablished == 0
+                            zz = abjfl; % if we made it through end of loop, cause an error to display error code below
+                        end
+                    catch
+                        set(lblSendingDirect,'Visible','on',...
+                            'String',{'Error connecting to server. (code 035)';'Please try again later.'})
+                        while 1==1
+                            pause
+                        end
+                    end
+                end
+
+
+                % creating folders and placing dicoms
+                close(cache3)
+                cache3 = sftp(ftp_ip1,ftp_user1,"Password",ftp_password);
+                cd(cache3,'hd1')
+                current_regions = dir(cache3);
+                region_list = {''};
+                for iij = 1:length(current_regions)
+                    region_list{iij} = char(current_regions(iij).name);
+                end
+                if max(strcmp(submittedRegionName,region_list)) == 0
+                    mkdir(cache3,submittedRegionName)
+                end
+                cd(cache3,submittedRegionName)
+
+                current_subregions = dir(cache3);
+                subregion_list = {''};
+                for iij = 1:length(current_subregions)
+                    subregion_list{iij} = char(current_subregions(iij).name);
+                end
+                if max(strcmp(submittedSubregionName,subregion_list)) == 0
+                    mkdir(cache3,submittedSubregionName)
+                end
+                cd(cache3,submittedSubregionName)
+
+                if submittedIsCT==1 && ~strcmp(datafile2send,'dicoms.zip')
+                    directSubmitErrorMsg = 'Data file not named dicoms.zip';
+                    set(lblSendingDirect,'String',directSubmitErrorMsg)
+                    break
+                end
+
+                if submittedIsCT==0 && ~strcmp(datafile2send,'xray.tiff')
+                    directSubmitErrorMsg = 'Data file not named xray.tiff';
+                    set(lblSendingDirect,'String',directSubmitErrorMsg)
+                    break
+                end
+
+                current_cores = dir(cache3);
+                cores_list = {''};
+                for iij = 1:length(current_cores)
+                    cores_list{iij} = char(current_cores(iij).name);
+                end
+                if max(strcmp(submittedCoreName,cores_list)) == 1 && strcmp(submittedSectionName,'')
+                    directSubmitErrorMsg = sprintf('Core %s folder already exists',submittedCoreName);
+                    set(lblSendingDirect,'String',directSubmitErrorMsg)
+                    break
+                elseif max(strcmp(submittedCoreName,cores_list)) == 0
+                    mkdir(cache3,submittedCoreName)
+                end
+                cd(cache3,submittedCoreName)
+
+                % check for sections
+                if ~strcmp(submittedSectionName,'') % there are sections
+                    current_sections = dir(cache3);
+                    sections_list = {''};
+                    for iij = 1:length(current_sections)
+                        sections_list{iij} = char(current_sections(iij).name);
+                    end
+                    if max(strcmp(submittedSectionName,sections_list)) == 1
+                        directSubmitErrorMsg = sprintf('Section %s folder already exists',submittedSectionName);
+                        set(lblSendingDirect,'String',directSubmitErrorMsg)
+                        break
+                    else max(strcmp(submittedCoreName,cores_list))
+                        mkdir(cache3,submittedSectionName)
+                    end
+                    cd(cache3,submittedSectionName)
+
+                    % place data
+                    if submittedIsCT==1
+                        mput(cache3,fullfile(selpathdata,'dicoms.zip'))
+                    elseif submittedIsCT==0
+                        mput(cache3,fullfile(selpathdata,'xray.tiff'))
+                    end
+
+                else % no sections, just add core
+                    if submittedIsCT==1
+                        mput(cache3,fullfile(selpathdata,'dicoms.zip'))
+                    elseif submittedIsCT==0
+                        mput(cache3,fullfile(selpathdata,'xray.tiff'))
+                    end
+                end
+
+                % don't add to directory for standards submissions
+
+                % import master directory list into this session (so as to
+                % make sure we have latest version from server)
+                try mget(cache3,'coral_directory_master.txt',fullfile(selpath,'my_corals'));
+                    coralDir = importdata(fullfile(selpath,'my_corals','coral_directory_master.txt'));
+                    %close(cache3);
+                catch
+                    cache3 = sftp(ftp_ip1,ftp_user1,"Password",ftp_password); % make sure we can connect to sftp server 1
+                    cd(cache3,'/CoralCache');
+                    mget(cache3,'coral_directory_master.txt',fullfile(selpath,'my_corals'));
+                    %close(cache3);
+                    coralDir = importdata(fullfile(selpath,'my_corals','coral_directory_master.txt'));
+                    try
+                        mget(cache1,'coral_directory_master.txt',fullfile(selpath,'my_corals'));
+                        coralDir = importdata(fullfile(selpath,'my_corals','coral_directory_master.txt'));
+                    catch
+                    end
+                end
+
+
+                if ~strcmp(submittedRegionName,'standards')
+                    % add to metadata
+                    coralDir.textdata(end+1,1:7) = newmeta_text(jji+1,1:7);
+                    coralDir.data(end+1,:) = newmeta_num(jji,:);
+
+                    coralDirHold = coralDir;
+                    coralDirHold.textdata = coralDirHold.textdata(2:end,:);
+                    coralDirStruct = struct('name',coralDirHold.textdata(:,1),...
+                        'piece',coralDirHold.textdata(:,2),...
+                        'region',coralDirHold.textdata(:,3),...
+                        'sub_region',coralDirHold.textdata(:,4),...
+                        'genus',coralDirHold.textdata(:,5),...
+                        'owner',coralDirHold.textdata(:,6),...
+                        'notes',coralDirHold.textdata(:,7),...
+                        'hard_drive',coralDirHold.data(1,1),...
+                        'flip',coralDirHold.data(1,2),...
+                        'lat',coralDirHold.data(1,3),...
+                        'lon',coralDirHold.data(1,4),...
+                        'depth',coralDirHold.data(1,5),...
+                        'month',coralDirHold.data(1,6),...
+                        'year',coralDirHold.data(1,7),...
+                        'file_size',coralDirHold.data(1,8),...
+                        'unlocked',coralDirHold.data(1,9),...
+                        'denslope',coralDirHold.data(1,10),...
+                        'denintercept',coralDirHold.data(1,11),...
+                        'ct',coralDirHold.data(1,12),...
+                        'xraypos',coralDirHold.data(1,13),...
+                        'dpi',coralDirHold.data(1,14));
+                    for ic = 1:length(coralDirHold.data)
+                        coralDirStruct(ic).hard_drive = coralDirHold.data(ic,1);
+                        coralDirStruct(ic).flip = coralDirHold.data(ic,2);
+                        coralDirStruct(ic).lat = coralDirHold.data(ic,3);
+                        coralDirStruct(ic).lon = coralDirHold.data(ic,4);
+                        coralDirStruct(ic).depth = coralDirHold.data(ic,5);
+                        coralDirStruct(ic).month = coralDirHold.data(ic,6);
+                        coralDirStruct(ic).year = coralDirHold.data(ic,7);
+                        coralDirStruct(ic).file_size = coralDirHold.data(ic,8);
+                        coralDirStruct(ic).unlocked = coralDirHold.data(ic,9);
+                        coralDirStruct(ic).denslope = coralDirHold.data(ic,10);
+                        coralDirStruct(ic).denintercept = coralDirHold.data(ic,11);
+                        coralDirStruct(ic).ct = coralDirHold.data(ic,12);
+                        coralDirStruct(ic).xraypos = coralDirHold.data(ic,13);
+                        coralDirStruct(ic).dpi = coralDirHold.data(ic,14);
+                    end
+                    writetable(struct2table(coralDirStruct),fullfile(selpath,'my_corals','coral_directory_master.txt'),'Delimiter','\t')
+                    close(cache3)
+                    cache3 = sftp(ftp_ip1,ftp_user1,"Password",ftp_password);
+                    cd(cache3,'CoralCache')
+                    mput(cache3,fullfile(selpath,'my_corals','coral_directory_master.txt'))
+                    % load new version into this session:
+                    coralDir = importdata(fullfile(selpath,'my_corals','coral_directory_master.txt'));
+
+                    % add to citation list
+                    % import master citation list into this session
+                    try mget(cache3,'coral_directory_citations.txt',fullfile(selpath,'my_corals'));
+                        citationDir = importdata(fullfile(selpath,'my_corals','coral_directory_citations.txt'));
+                        %close(cache3);
+                    catch
+                        cache3 = sftp(ftp_ip1,ftp_user1,"Password",ftp_password); % make sure we can connect to sftp server 1
+                        cd(cache3,'/CoralCache');
+                        mget(cache3,'coral_directory_citations.txt',fullfile(selpath,'my_corals'));
+                        %close(cache3);
+                        citationDir = importdata(fullfile(selpath,'my_corals','coral_directory_citations.txt'));
+                        try
+                            mget(cache1,'coral_directory_citations.txt',fullfile(selpath,'my_corals'));
+                            citationDir = importdata(fullfile(selpath,'my_corals','coral_directory_citations.txt'));
+                        catch
+                        end
+                    end
+
+                    citationDir.textdata(end+1,1:2) = newmeta_text(jji+1,1:2);
+                    citationDir.textdata(end,3:4) = newmeta_text(jji+1,8:9);
+                    citationDir.data(end+1,1) = 1;
+
+                    citationDirHold = citationDir;
+                    citationDirHold.textdata = citationDirHold.textdata(2:end,:);
+                    citationDirStruct = struct('name',citationDirHold.textdata(:,1),...
+                        'piece',citationDirHold.textdata(:,2),...
+                        'citation',citationDirHold.textdata(:,3),...
+                        'acknowledgement',citationDirHold.textdata(:,4));
+                    for ic = 1:length(citationDirHold.data)
+                        citationDirStruct(ic).num = citationDirHold.data(ic,1);
+                    end
+                    writetable(struct2table(citationDirStruct),fullfile(selpath,'my_corals','coral_directory_citations.txt'),'Delimiter','\t')
+                    try mput(cache3,fullfile(selpath,'my_corals','coral_directory_citations.txt'));
+                        close(cache3);
+                    catch
+                        cache3 = sftp(ftp_ip1,ftp_user1,"Password",ftp_password); % make sure we can connect to sftp server 1
+                        cd(cache3,'/CoralCache');
+                        mput(cache3,fullfile(selpath,'my_corals','coral_directory_citations.txt'));close(cache3);
+                        citationDir = importdata(fullfile(selpath,'my_corals','coral_directory_citations.txt'));
+                        try
+                            mput(cache1,fullfile(selpath,'my_corals','coral_directory_citations.txt'));
+                        catch
+                        end
+                    end
+                end
+                successDirect = 1;
+            end
+
+            set(editDataCancelIn,'Enable','on')
+            set(directSubmitGoIn,'Enable','off')
+            set(directSubmitMetaIn,'Enable','on')
+            set(directSubmitDataIn,'Enable','on')
+            set(makeMapIn0,'Enable','on')
+            haveMeta = 0;
+            haveData = 0;
+            if successDirect == 1
+                set(lblSendingDirect,'Visible','off')
+            end
+            set(uiAbout3,'Enable','on')
+        catch
+            set(lblSendingDirect,'String','Unknown error, try again')
+            set(editDataCancelIn,'Enable','on')
+        end
+
+    end
+
 
     function editData(src,event)
 
@@ -1762,8 +3487,10 @@ htextAbout3 = uicontrol(UserFig,'Style','text','String',' ',...
         set(editDataCancelIn,'Visible','on')
         set(convertTifIn,'Visible','on')
         set(resizeDicomsIn,'Visible','on')
-        set(editDataCancelIn,'Visible','on')
         set(rotateDicomsIn,'Visible','on')
+        set(cropDicomsIn0,'Visible','on')
+        set(editDataCancelIn,'Visible','on')
+        set(directSubmit0In,'Visible','off')
 
     end
 
@@ -1782,7 +3509,26 @@ htextAbout3 = uicontrol(UserFig,'Style','text','String',' ',...
         set(convertTifIn,'Visible','off')
         set(resizeDicomsIn,'Visible','off')
         set(rotateDicomsIn,'Visible','off')
+        set(cropDicomsIn0,'Visible','off')
 
+        set(directSubmitMetaIn,'Enable','on')
+        set(directSubmitDataIn,'Enable','on')
+        %set(directSubmit0In,'Visible','on') %ZZ turn back on for direct submission
+        set(directSubmitIn,'Visible','off')
+        set(htextLinkUserGuide,'Visible','off')
+        set(directSubmitGoIn,'Visible','off')
+        set(directSubmitMetaIn,'Visible','off')
+        set(directSubmitDataIn,'Visible','off')
+        set(lblSendingDirect,'Visible','off')
+        set(uiAbout3,'Enable','on')
+
+        set(makeMapIn0,'Enable','on')
+        set(makeMapIn0,'Visible','off')
+
+        set(cropDicomsInAxial,'Visible','off')
+        set(cropDicomsInSagittal,'Visible','off')
+        set(cropDicomsInCoronal,'Visible','off')
+        
     end
 
     function rotateDicoms(src,event)
@@ -1802,6 +3548,7 @@ htextAbout3 = uicontrol(UserFig,'Style','text','String',' ',...
             set(convertTifIn,'Visible','on')
             set(resizeDicomsIn,'Visible','on')
             set(rotateDicomsIn,'Visible','on')
+            set(cropDicomsIn0,'Visible','on')
             set(htextRotate,'Visible','off')
             set(rotateSetIn,'Visible','off')
             set(launchRotateIn,'Visible','off')
@@ -1813,10 +3560,11 @@ htextAbout3 = uicontrol(UserFig,'Style','text','String',' ',...
 
         set(resizeDicomsIn,'Visible','off')
         set(rotateDicomsIn,'Visible','off')
+        set(cropDicomsIn0,'Visible','off')
         set(convertTifIn,'Visible','off')
         set(editDataCancelIn,'Visible','off')
 
-        fileOpen = selpath3;
+        fileOpen = selpath;
 
         htextRotate = uicontrol(UserFig,'Style','text','String',{'Permute dimensions';'(i.e. [3,2,1] flips the third';'dimension with the first)'},'Position',[725,340,300,80],...
             'BackgroundColor','none','FontSize',11,'FontName','Arial','Units','normalized','Visible','on');
@@ -1853,7 +3601,7 @@ htextAbout3 = uicontrol(UserFig,'Style','text','String',' ',...
         pxS = hpxS;
         hpxS = abs(sliceLoc0(2)-sliceLoc0(1));
         row = length(sliceLoc0);
-        layers = length(X(1,1,:));
+        layers = length(X(1,1,:));   
         sliceLoc = pxS:pxS:layers*pxS;
 
         thisUID = dicomuid;
@@ -1882,6 +3630,210 @@ htextAbout3 = uicontrol(UserFig,'Style','text','String',' ',...
 
     end
 
+        function [sliceLoc,metadata] = loadDataResize(voxRz)
+
+            % load data
+
+            [X,metadata,sliceLoc] = read_dcm3Resize(fileOpen,voxRz);
+
+            [row,col,layers] = size(X); % size of the image
+
+            % image pixel spacing
+            hpxS = metadata.PixelSpacing(1)/(1/round(1/voxRz));
+
+            % vertical pixel spacing (mm)
+            sliceDif = median(sliceLoc(2:end)-sliceLoc(1:end-1));
+            pxS = abs(sliceDif);
+            if max(abs(min(sliceLoc(2:end)-sliceLoc(1:end-1))-sliceDif)) > 0.0001 || ...
+                    max(abs(max(sliceLoc(2:end)-sliceLoc(1:end-1))-sliceDif)) > 0.0001
+                fprintf('WARNING: UNEVEN DICOM SPACING!')
+
+                % sort X by slice location
+                sliceLoc = flipdim(sliceLoc,2);
+                [b,idx] = sort(sliceLoc);
+                x2 = X(:,:,idx);
+                X = x2;
+
+            end
+
+        end
+
+        function [X,metadata,sliceLoc] = read_dcm3Resize(dIn,voxRz)
+
+            % read DCM files from input directory into matrix
+
+            inpath = dIn;
+
+            % make sure the filename ends with a '/'
+            if inpath(end) ~= filesep
+                inpath = [inpath filesep];
+            end
+
+            % directory of subfolders within set path
+            folders = dir(inpath);
+
+            layerCount = 0; % keep track of where to write files in matrix
+
+            allSlice = [];
+
+            check1 = 1; % check for whether we have found image size
+
+            % initialize
+            X = [];
+
+            remove = [];
+            for jj = 1:length(folders)
+                if strcmp('.',folders(jj).name)
+                    remove = [remove jj];
+                end
+                if strcmp('..',folders(jj).name)
+                    remove = [remove jj];
+                end
+                if strcmp('.DS_Store',folders(jj).name)
+                    remove = [remove jj];
+                end
+            end
+            folders(remove) = [];
+
+            breakCheck = 0;
+
+            for j = 1:length(folders)
+
+                % directory of DICOM files within subfolders
+                D = dir([[inpath folders(j).name filesep] '*.dcm']);
+                if length(D) < 1
+                    D = dir([[inpath folders(j).name filesep] '*.IMA']);
+                end
+                if length(D) < 1
+                    D = dir([[inpath folders(j).name filesep] '*.bmp']);
+                end
+
+                % remove the invisible files added by some USB drives:
+                remove = [];
+                for jj = 1:length(D)
+                    if strcmp('._',D(jj).name(1:2))
+                        remove = [remove jj];
+                    end
+                end
+                D(remove) = [];
+
+                % check image size
+                if length(D) && check1
+                    metadata = dicominfo([[inpath folders(j).name filesep] filesep D(1).name]);
+                    ro = ceil(double(metadata.Height) * 1/round(1/voxRz));
+                    co = ceil(double(metadata.Width) * 1/round(1/voxRz));
+                    check1 = 0;
+                end
+
+                % we know each image is roXco, initialize here
+                checkX = 0;
+                try isempty(X);
+                    nAvg = round(length(D)/ceil(length(D)*(1/round(1/voxRz))));
+                    nLayers = ceil(length(D)*(1/nAvg));
+                    X(:,:,end+1:end+nLayers) = 0;
+                    sliceLoc(end+1:end+nLayers) = 0;
+                    checkX = 1;
+                catch
+                end
+                if checkX == 0 && check1 == 0 & ~isnan(ceil(length(D)*(1/nAvg)))
+                    nAvg = round(length(D)/ceil(length(D)*(1/round(1/voxRz))));
+                    nLayers = ceil(length(D)*(1/nAvg))-1;
+                    X = zeros(ro,co,nLayers,'double');
+                    sliceLoc = zeros(1,nLayers);
+                end
+
+                skip = 0;
+
+                if isnan(nLayers)
+                    nLayers = 0;
+                end
+
+                % iterating over each file, read the image and populate the appropriate
+                % layer in matrix X
+                if nLayers>1
+                    for i1 = 1:nLayers
+
+                        skipCheck = 0;
+
+                        % read metadata
+                        % if i1 == 1
+                        %     metadata = dicominfo([[inpath folders(j).name] filesep D(1).name]);
+                        % end
+
+                        metadata = dicominfo([[inpath folders(j).name] filesep D((i1-1)*(nAvg)+1).name]);
+
+                        if isfield(metadata,'SliceLocation') == 1
+                            if min(abs(allSlice-metadata.SliceLocation)) == 0
+                                skipCheck = 1;
+                            end
+                        elseif isfield(metadata,'ImagePositionPatient') == 1
+                            if min(abs(allSlice-metadata.ImagePositionPatient(3))) == 0
+                                skipCheck = 1;
+                            end
+                        elseif isfield(metadata,'InstanceNumber') == 1
+                            if min(abs(allSlice-metadata.InstanceNumber)) == 0
+                                skipCheck = 1;
+                            end
+                        end
+
+                        % read DICOM
+                        x = NaN(ro,co,nAvg);
+                        for jj = 1:nAvg
+                            x(:,:,jj) = imresize(dicomread([[inpath folders(j).name] filesep D((i1-1)*(nAvg)+jj).name]),1/round(1/voxRz));
+                        end
+                        X(:,:,i1+layerCount-skip) = mean(x,3);
+                        
+                        if isfield(metadata,'SliceLocation') == 1
+                            sliceLoc(i1+layerCount-skip) = metadata.SliceLocation;
+                        elseif isfield(metadata,'ImagePositionPatient') == 1
+                            sliceLoc(i1+layerCount-skip) = metadata.ImagePositionPatient(3);
+                        elseif isfield(metadata,'InstanceNumber') == 1
+                            sliceLoc(i1+layerCount-skip) = metadata.InstanceNumber;
+                        end
+
+                        % delete DICOM if this is a repeat
+                        if skipCheck == 1
+                            X(:,:,i1+layerCount-skip) = [];
+                            sliceLoc(i1+layerCount-skip) = [];
+                        end
+
+                        if isfield(metadata,'SliceLocation') == 1
+                            if min(abs(allSlice-metadata.SliceLocation)) == 0
+                                skip = skip + 1;
+                            end
+                            allSlice = [allSlice metadata.SliceLocation];
+                        elseif isfield(metadata,'ImagePositionPatient') == 1
+                            if min(abs(allSlice-metadata.ImagePositionPatient(3))) == 0
+                                skip = skip + 1;
+                            end
+                            allSlice = [allSlice metadata.ImagePositionPatient(3)];
+                        elseif isfield(metadata,'InstanceNumber') == 1
+                            if min(abs(allSlice-metadata.InstanceNumber)) == 0
+                                skip = skip + 1;
+                            end
+                            allSlice = [allSlice metadata.InstanceNumber];
+                        end
+                        progressUpdate(i1/nLayers)
+                    end
+                end
+                if length(X)
+                    layerCount = length(X(1,1,:)); % keep track of size of X
+                end
+
+                %if p == 1
+                    %progressUpdate(i1/layers)
+                %end
+
+            end
+
+            % now rescale all the intensity values in the matrix so that the matrix
+            % contains the original intensity values rather than the scaled values that
+            % dicomread produces
+            X = X.*metadata.RescaleSlope + metadata.RescaleIntercept;
+
+        end
+
+
     function resizeDicoms(src,event)
 
         set(UserFig,'Visible','off')
@@ -1895,6 +3847,7 @@ htextAbout3 = uicontrol(UserFig,'Style','text','String',' ',...
             set(convertTifIn,'Visible','on')
             set(resizeDicomsIn,'Visible','on')
             set(rotateDicomsIn,'Visible','on')
+            set(cropDicomsIn0,'Visible','on')
             set(htextFactor,'Visible','off')
             set(factorSetIn,'Visible','off')
             set(launchResizeIn,'Visible','off')
@@ -1907,6 +3860,8 @@ htextAbout3 = uicontrol(UserFig,'Style','text','String',' ',...
         set(resizeDicomsIn,'Visible','off')
         set(convertTifIn,'Visible','off')
         set(editDataCancelIn,'Visible','off')
+        set(rotateDicomsIn,'Visible','off')
+        set(cropDicomsIn0,'Visible','off')
 
         fileOpen = selpath3;
 
@@ -1937,9 +3892,30 @@ htextAbout3 = uicontrol(UserFig,'Style','text','String',' ',...
 
         resizeFactor = str2num(factorSetIn.String);
 
+        ha3 = uiaxes(UserFig,'Units','Pixels','Position',[715,40,250,60],'Units','normalized','Visible','on');
+        ha3.InteractionOptions.DatatipsSupported = 'off';
+        ha3.InteractionOptions.ZoomSupported = "off";
+        ha3.InteractionOptions.PanSupported = "off";
+        ha3.Toolbar.Visible = 'off';
+        hold(ha3,'on')
+        set(ha3,'Xtick',[],'YTick',[],'XLim',[0 1],'YLim',[0 1])
+        %processNumber = processNumber + 1;
+        titleName = 'loading CT data';
         [sliceLoc,metadata] = loadDataResize(resizeFactor);
+        delete(p1)
+        delete(ha3)
+        ha3 = uiaxes(UserFig,'Units','Pixels','Position',[715,40,250,60],'Units','normalized','Visible','on');
+        ha3.InteractionOptions.DatatipsSupported = 'off';
+        ha3.InteractionOptions.ZoomSupported = "off";
+        ha3.InteractionOptions.PanSupported = "off";
+        ha3.Toolbar.Visible = 'off';
+        hold(ha3,'on')
+        set(ha3,'Xtick',[],'YTick',[],'XLim',[0 1],'YLim',[0 1])
 
         thisUID = dicomuid;
+
+        %processNumber = processNumber;
+        titleName = 'Resizing data';
 
         for a = 1:layers
             thisMeta = metadata;
@@ -1958,182 +3934,185 @@ htextAbout3 = uicontrol(UserFig,'Style','text','String',' ',...
                 pad = [pad,'0'];
             end
             dicomwrite(uint16((X(:,:,a)-metadata.RescaleIntercept)/metadata.RescaleSlope),fullfile(selpath3,folder_name,strcat(pad,num2str(a),'.dcm')),thisMeta);
-        end
+            progressUpdate(a/layers)
+        end        
 
+        delete(p1)
+        delete(ha3)
+        %set(ha3,'Visible','off','Units','Pixels','Position',[200,160,500,50],'Units','normalized')
         editDataCancel2
         set(editDataCancelIn2,'Visible','off')
 
-    end
-
-    function [sliceLoc,metadata] = loadDataResize(voxRz)
-
-        % load data
-
-        [X,metadata,sliceLoc] = read_dcm3Resize(fileOpen,voxRz);
-
-        [row,col,layers] = size(X); % size of the image
-
-        % image pixel spacing
-        hpxS = metadata.PixelSpacing(1)/(1/round(1/voxRz));
-
-        % vertical pixel spacing (mm)
-        sliceDif = median(sliceLoc(2:end)-sliceLoc(1:end-1));
-        pxS = abs(sliceDif);
-        if max(abs(min(sliceLoc(2:end)-sliceLoc(1:end-1))-sliceDif)) > 0.0001 || ...
-                max(abs(max(sliceLoc(2:end)-sliceLoc(1:end-1))-sliceDif)) > 0.0001
-            fprintf('WARNING: UNEVEN DICOM SPACING!')
-
-            % sort X by slice location
-            sliceLoc = flipdim(sliceLoc,2);
-            [b,idx] = sort(sliceLoc);
-            x2 = X(:,:,idx);
-            X = x2;
-
-        end
-
-    end
-
-    function [X,metadata,sliceLoc] = read_dcm3Resize(dIn,voxRz)
-
-        % read DCM files from input directory into matrix
-
-        inpath = dIn;
-
-        % make sure the filename ends with a '/'
-        if inpath(end) ~= filesep
-            inpath = [inpath filesep];
-        end
-
-        % directory of subfolders within set path
-        folders = dir(inpath);
-
-        layerCount = 0; % keep track of where to write files in matrix
-
-        allSlice = [];
-
-        check1 = 1; % check for whether we have found image size
-
-        % initialize
-        X = [];
-
-        remove = [];
-        for jj = 1:length(folders)
-            if strcmp('.',folders(jj).name)
-                remove = [remove jj];
-            end
-            if strcmp('..',folders(jj).name)
-                remove = [remove jj];
-            end
-            if strcmp('.DS_Store',folders(jj).name)
-                remove = [remove jj];
-            end
-        end
-        folders(remove) = [];
-
-        breakCheck = 0;
-
-        for j = 1:length(folders)
-
-            % directory of DICOM files within subfolders
-            D = dir([[inpath folders(j).name filesep] '*.dcm']);
-            if length(D) < 1
-                D = dir([[inpath folders(j).name filesep] '*.IMA']);
-            end
-            if length(D) < 1
-                D = dir([[inpath folders(j).name filesep] '*.bmp']);
-            end
-
-            % remove the invisible files added by some USB drives:
-            remove = [];
-            for jj = 1:length(D)
-                if strcmp('._',D(jj).name(1:2))
-                    remove = [remove jj];
-                end
-            end
-            D(remove) = [];
-
-            % check image size
-            if length(D) && check1
-                metadata = dicominfo([[inpath folders(j).name filesep] filesep D(1).name]);
-                ro = ceil(double(metadata.Height) * 1/round(1/voxRz));
-                co = ceil(double(metadata.Width) * 1/round(1/voxRz));
-                check1 = 0;
-            end
-
-            % we know each image is roXco, initialize here
-            checkX = 0;
-            try isempty(X);
-                nAvg = round(length(D)/ceil(length(D)*(1/round(1/voxRz))));
-                nLayers = ceil(length(D)*(1/nAvg));
-                X(:,:,end+1:end+nLayers) = 0;
-                sliceLoc(end+1:end+nLayers) = 0;
-                checkX = 1;
-            catch
-            end
-            if checkX == 0 && check1 == 0 & ~isnan(ceil(length(D)*(1/nAvg)))
-                nAvg = round(length(D)/ceil(length(D)*(1/round(1/voxRz))));
-                nLayers = ceil(length(D)*(1/nAvg))-1;
-                X = zeros(ro,co,nLayers,'double');
-                sliceLoc = zeros(1,nLayers);
-            end
-
-            skip = 0;
-
-            if isnan(nLayers)
-                nLayers = 0;
-            end
-
-            % iterating over each file, read the image and populate the appropriate
-            % layer in matrix X
-            if nLayers>1
-                for i1 = 1:nLayers
-
-                    skipCheck = 0;
-
-                    % read metadata
-                    % if i1 == 1
-                    %     metadata = dicominfo([[inpath folders(j).name] filesep D(1).name]);
-                    % end
-
-                    metadata = dicominfo([[inpath folders(j).name] filesep D((i1-1)*(nAvg)+1).name]);
-
-                    if min(abs(allSlice-metadata.SliceLocation)) == 0
-                        skipCheck = 1;
-                    end
-
-                    % read DICOM
-                    x = NaN(ro,co,nAvg);
-                    for jj = 1:nAvg
-                        x(:,:,jj) = imresize(dicomread([[inpath folders(j).name] filesep D((i1-1)*(nAvg)+jj).name]),1/round(1/voxRz));
-                    end
-                    X(:,:,i1+layerCount-skip) = mean(x,3);
-                    sliceLoc(i1+layerCount-skip) = metadata.SliceLocation;
-
-                    % delete DICOM if this is a repeat
-                    if skipCheck == 1
-                        X(:,:,i1+layerCount-skip) = [];
-                        sliceLoc(i1+layerCount-skip) = [];
-                    end
-
-                    if min(abs(allSlice-metadata.SliceLocation)) == 0
-                        skip = skip + 1;
-                    end
-
-                    allSlice = [allSlice metadata.SliceLocation];
-
-                end
-            end
-            if length(X)
-                layerCount = length(X(1,1,:)); % keep track of size of X
-            end
-
-        end
-
-        % now rescale all the intensity values in the matrix so that the matrix
-        % contains the original intensity values rather than the scaled values that
-        % dicomread produces
-        X = X.*metadata.RescaleSlope + metadata.RescaleIntercept;
-
+        % function [sliceLoc,metadata] = loadDataResize(voxRz)
+        % 
+        %     % load data
+        % 
+        %     [X,metadata,sliceLoc] = read_dcm3Resize(fileOpen,voxRz);
+        % 
+        %     [row,col,layers] = size(X); % size of the image
+        % 
+        %     % image pixel spacing
+        %     hpxS = metadata.PixelSpacing(1)/(1/round(1/voxRz));
+        % 
+        %     % vertical pixel spacing (mm)
+        %     sliceDif = median(sliceLoc(2:end)-sliceLoc(1:end-1));
+        %     pxS = abs(sliceDif);
+        %     if max(abs(min(sliceLoc(2:end)-sliceLoc(1:end-1))-sliceDif)) > 0.0001 || ...
+        %             max(abs(max(sliceLoc(2:end)-sliceLoc(1:end-1))-sliceDif)) > 0.0001
+        %         fprintf('WARNING: UNEVEN DICOM SPACING!')
+        % 
+        %         % sort X by slice location
+        %         sliceLoc = flipdim(sliceLoc,2);
+        %         [b,idx] = sort(sliceLoc);
+        %         x2 = X(:,:,idx);
+        %         X = x2;
+        % 
+        %     end
+        % 
+        % end
+        % 
+        % function [X,metadata,sliceLoc] = read_dcm3Resize(dIn,voxRz)
+        % 
+        %     % read DCM files from input directory into matrix
+        % 
+        %     inpath = dIn;
+        % 
+        %     % make sure the filename ends with a '/'
+        %     if inpath(end) ~= filesep
+        %         inpath = [inpath filesep];
+        %     end
+        % 
+        %     % directory of subfolders within set path
+        %     folders = dir(inpath);
+        % 
+        %     layerCount = 0; % keep track of where to write files in matrix
+        % 
+        %     allSlice = [];
+        % 
+        %     check1 = 1; % check for whether we have found image size
+        % 
+        %     % initialize
+        %     X = [];
+        % 
+        %     remove = [];
+        %     for jj = 1:length(folders)
+        %         if strcmp('.',folders(jj).name)
+        %             remove = [remove jj];
+        %         end
+        %         if strcmp('..',folders(jj).name)
+        %             remove = [remove jj];
+        %         end
+        %         if strcmp('.DS_Store',folders(jj).name)
+        %             remove = [remove jj];
+        %         end
+        %     end
+        %     folders(remove) = [];
+        % 
+        %     breakCheck = 0;
+        % 
+        %     for j = 1:length(folders)
+        % 
+        %         % directory of DICOM files within subfolders
+        %         D = dir([[inpath folders(j).name filesep] '*.dcm']);
+        %         if length(D) < 1
+        %             D = dir([[inpath folders(j).name filesep] '*.IMA']);
+        %         end
+        %         if length(D) < 1
+        %             D = dir([[inpath folders(j).name filesep] '*.bmp']);
+        %         end
+        % 
+        %         % remove the invisible files added by some USB drives:
+        %         remove = [];
+        %         for jj = 1:length(D)
+        %             if strcmp('._',D(jj).name(1:2))
+        %                 remove = [remove jj];
+        %             end
+        %         end
+        %         D(remove) = [];
+        % 
+        %         % check image size
+        %         if length(D) && check1
+        %             metadata = dicominfo([[inpath folders(j).name filesep] filesep D(1).name]);
+        %             ro = ceil(double(metadata.Height) * 1/round(1/voxRz));
+        %             co = ceil(double(metadata.Width) * 1/round(1/voxRz));
+        %             check1 = 0;
+        %         end
+        % 
+        %         % we know each image is roXco, initialize here
+        %         checkX = 0;
+        %         try isempty(X);
+        %             nAvg = round(length(D)/ceil(length(D)*(1/round(1/voxRz))));
+        %             nLayers = ceil(length(D)*(1/nAvg));
+        %             X(:,:,end+1:end+nLayers) = 0;
+        %             sliceLoc(end+1:end+nLayers) = 0;
+        %             checkX = 1;
+        %         catch
+        %         end
+        %         if checkX == 0 && check1 == 0 & ~isnan(ceil(length(D)*(1/nAvg)))
+        %             nAvg = round(length(D)/ceil(length(D)*(1/round(1/voxRz))));
+        %             nLayers = ceil(length(D)*(1/nAvg))-1;
+        %             X = zeros(ro,co,nLayers,'double');
+        %             sliceLoc = zeros(1,nLayers);
+        %         end
+        % 
+        %         skip = 0;
+        % 
+        %         if isnan(nLayers)
+        %             nLayers = 0;
+        %         end
+        % 
+        %         % iterating over each file, read the image and populate the appropriate
+        %         % layer in matrix X
+        %         if nLayers>1
+        %             for i1 = 1:nLayers
+        % 
+        %                 skipCheck = 0;
+        % 
+        %                 % read metadata
+        %                 % if i1 == 1
+        %                 %     metadata = dicominfo([[inpath folders(j).name] filesep D(1).name]);
+        %                 % end
+        % 
+        %                 metadata = dicominfo([[inpath folders(j).name] filesep D((i1-1)*(nAvg)+1).name]);
+        % 
+        %                 if min(abs(allSlice-metadata.SliceLocation)) == 0
+        %                     skipCheck = 1;
+        %                 end
+        % 
+        %                 % read DICOM
+        %                 x = NaN(ro,co,nAvg);
+        %                 for jj = 1:nAvg
+        %                     x(:,:,jj) = imresize(dicomread([[inpath folders(j).name] filesep D((i1-1)*(nAvg)+jj).name]),1/round(1/voxRz));
+        %                 end
+        %                 X(:,:,i1+layerCount-skip) = mean(x,3);
+        %                 sliceLoc(i1+layerCount-skip) = metadata.SliceLocation;
+        % 
+        %                 % delete DICOM if this is a repeat
+        %                 if skipCheck == 1
+        %                     X(:,:,i1+layerCount-skip) = [];
+        %                     sliceLoc(i1+layerCount-skip) = [];
+        %                 end
+        % 
+        %                 if min(abs(allSlice-metadata.SliceLocation)) == 0
+        %                     skip = skip + 1;
+        %                 end
+        % 
+        %                 allSlice = [allSlice metadata.SliceLocation];
+        % 
+        %             end
+        %         end
+        %         if length(X)
+        %             layerCount = length(X(1,1,:)); % keep track of size of X
+        %         end
+        % 
+        %     end
+        % 
+        %     % now rescale all the intensity values in the matrix so that the matrix
+        %     % contains the original intensity values rather than the scaled values that
+        %     % dicomread produces
+        %     X = X.*metadata.RescaleSlope + metadata.RescaleIntercept;
+        % 
+        % end
     end
 
     function convertTif(src,event)
@@ -2149,6 +4128,7 @@ htextAbout3 = uicontrol(UserFig,'Style','text','String',' ',...
             set(convertTifIn,'Visible','on')
             set(resizeDicomsIn,'Visible','on')
             set(rotateDicomsIn,'Visible','on')
+            set(cropDicomsIn0,'Visible','on')
             set(htextSlope,'Visible','off')
             set(slopeSetIn,'Visible','off')
             set(htextIntercept,'Visible','off')
@@ -2171,6 +4151,8 @@ htextAbout3 = uicontrol(UserFig,'Style','text','String',' ',...
         set(resizeDicomsIn,'Visible','off')
         set(convertTifIn,'Visible','off')
         set(editDataCancelIn,'Visible','off')
+        set(rotateDicomsIn,'Visible','off')
+        set(cropDicomsIn0,'Visible','off')
 
         d1 = dir(strcat(selpath3,filesep,'*.tif'));
 
@@ -2238,6 +4220,16 @@ htextAbout3 = uicontrol(UserFig,'Style','text','String',' ',...
         width = str2num(pixelSetIn.String); % mm
         spacing = str2num(sliceSetIn.String); % mm
 
+        ha3 = uiaxes(UserFig,'Units','Pixels','Position',[715,40,250,60],'Units','normalized','Visible','on');
+        ha3.InteractionOptions.DatatipsSupported = 'off';
+        ha3.InteractionOptions.ZoomSupported = "off";
+        ha3.InteractionOptions.PanSupported = "off";
+        ha3.Toolbar.Visible = 'off';
+        hold(ha3,'on')
+        set(ha3,'Xtick',[],'YTick',[],'XLim',[0 1],'YLim',[0 1])
+        %processNumber = processNumber + 1;
+        titleName = 'Converting Tiffs';
+
         for i = 1:length(d1)
 
             info = imfinfo(fullfile(selpath3,d1(i).name));
@@ -2288,7 +4280,12 @@ htextAbout3 = uicontrol(UserFig,'Style','text','String',' ',...
             end
             dicomwrite(uint16(currentImage),fullfile(selpath3,folder_name,strcat(pad,num2str(i),'.dcm')),thisMeta);
 
+            progressUpdate(i/length(d1))
+
         end
+
+        delete(p1)
+        delete(ha3)
 
         editDataCancel2
         set(editDataCancelIn2,'Visible','off')
@@ -2313,6 +4310,7 @@ htextAbout3 = uicontrol(UserFig,'Style','text','String',' ',...
         set(lblOverwrite,'Visible','off')
         set(lblUploadError,'Visible','off')
         set(lblUploadError2,'Visible','off')
+        set(directSubmit0In,'Visible','off')
         pause(0.001)
 
         selpath3 = uigetdir;
@@ -2322,18 +4320,54 @@ htextAbout3 = uicontrol(UserFig,'Style','text','String',' ',...
 
         set(lblGracious,'String',{'CoralCache depends on your data!';'Thank you for sharing your data to help this community effort.'})
 
-        lblSending = uicontrol(UserFig,'Style','text','String','Sending data...','Position',[720,80,250,20],...
+        lblSending = uicontrol(UserFig,'Style','text','String','Sending data...','Position',[720,80,250,40],...
             'BackgroundColor','none','FontSize',12,'FontName','Arial','Units','normalized');
 
         pause(0.001)
 
         try checkcon = dir(cache1);
+            cd(cache1,'submitted_data')
         catch
-            cache1 = ftp(ftp_ip1,ftp_user1,ftp_password);
+            try
+                cache1 = sftp(ftp_ip1,ftp_user1,"Password",ftp_password);
+            catch
+                try
+                    connectTimes = [1,2,3,5,10,60,60*12]; % minutes
+                    connectionEstablished = 0;
+                    for ij = 1:length(connectTimes)
+                        if connectionEstablished == 0
+                            if connectTimes(ij) == 1
+                                waitText = [' ',num2str(connectTimes(ij)),' minute.']
+                            else
+                                waitText = [' ',num2str(connectTimes(ij)),' minutes.']
+                            end
+                            set(lblSending,'Units','Pixels','Visible','on',...
+                                'String',{'Error connecting to server.';strcat('Trying again in',waitText)})
+                            pause(connectTimes(ij)*60)
+                            try
+                                cache1 = sftp(ftp_ip1,ftp_user1,"Password",ftp_password);
+                                connectionEstablished = 1;
+                                set(lblSending,'String','Sending data...')
+                            catch
+                            end
+                        end
+                    end
+                    if connectionEstablished == 0
+                        zz = abjfl; % if we made it through end of loop, cause an error to display error code below
+                    end
+                catch
+                    set(lblSending,'Visible','on',...
+                        'String',{'Error connecting to server. (code 031)';'Please try again later.'})
+                    while 1==1
+                        pause
+                    end
+                end
+            end
             cd(cache1,'CoralCache')
+            cd(cache1,'submitted_data')
         end
 
-        cd(cache1,'submitted_data')
+        %cd(cache1,'submitted_data')
         thisDir = dir(cache1);
         noDuplicate = 1;
         for iii = 1:length(thisDir)
@@ -2341,6 +4375,21 @@ htextAbout3 = uicontrol(UserFig,'Style','text','String',' ',...
                 set(lblOverwrite,'Visible','on')
                 noDuplicate = 0;
             end
+        end
+
+        try
+            submission_code = round(rand([1,4])*10);
+            submission_text = strcat([num2str(submission_code(1)),num2str(submission_code(2)),num2str(submission_code(3)),num2str(submission_code(4))]);
+            C = [{UserSetIn.String}, {datetime('now')}, {file2send}];
+            fid8 = fopen(fullfile(refPath,strcat('new_submission_attempt_',submission_text,'.csv')));
+            writecell(C,fullfile(refPath,strcat('new_submission_attempt_',submission_text,'.csv')));
+            pause(2)
+            mput(cache1,fullfile(refPath,strcat('new_submission_attempt_',submission_text,'.csv')));
+            try fclose(fid8);
+            catch
+            end
+            delete(fullfile(refPath,strcat('new_submission_attempt_',submission_text,'.csv')));
+        catch
         end
 
         thisWorked = 0;
@@ -2364,9 +4413,9 @@ htextAbout3 = uicontrol(UserFig,'Style','text','String',' ',...
         set(lblSending,'Visible','off')
 
         close(cache1)
-        cache1 = ftp(ftp_ip1,ftp_user1,ftp_password);
+        cache1 = sftp(ftp_ip1,ftp_user1,"Password",ftp_password);
         cd(cache1,'CoralCache')
-        if thisWorked == 1
+        %if thisWorked == 1
             try
                 try mget(cache1,'submission_log.csv',strcat(refPath));
                 catch
@@ -2384,7 +4433,11 @@ htextAbout3 = uicontrol(UserFig,'Style','text','String',' ',...
                 submit_log_dates = submitLog{2};
                 submit_log_cores = submitLog{3};
                 submit_log_users{n_submit_log+1} = UserSetIn.String;
-                submit_log_dates{n_submit_log+1} = datetime('now');
+                if thisWorked == 1
+                    submit_log_dates{n_submit_log+1} = datetime('now');
+                else
+                    submit_log_dates{n_submit_log+1} = 'unsuccessful';
+                end
                 submit_log_cores{n_submit_log+1} = file2send;
                 C = [submit_log_users, submit_log_dates, submit_log_cores];
                 fid7 = fopen(fullfile(refPath,'submission_log.csv'));
@@ -2397,7 +4450,7 @@ htextAbout3 = uicontrol(UserFig,'Style','text','String',' ',...
                 delete(fullfile(refPath,'submission_log.csv'));
             catch
             end
-        end
+        %end
     end
 
 % Function for submitting CT data file
@@ -2417,6 +4470,7 @@ htextAbout3 = uicontrol(UserFig,'Style','text','String',' ',...
         set(lblOverwrite,'Visible','off')
         set(lblUploadError,'Visible','off')
         set(lblUploadError2,'Visible','off')
+        %set(directSubmit0In,'Visible','on')
         pause(0.001)
 
         [file2send,selpath3] = uigetfile('.zip');
@@ -2424,18 +4478,54 @@ htextAbout3 = uicontrol(UserFig,'Style','text','String',' ',...
 
         set(lblGracious,'String',{'CoralCache depends on your data!';'Thank you for sharing your data to help this community effort.'})
 
-        lblSending = uicontrol(UserFig,'Style','text','String','Sending data...','Position',[720,80,250,20],...
+        lblSending = uicontrol(UserFig,'Style','text','String','Sending data...','Position',[720,80,250,40],...
             'BackgroundColor','none','FontSize',10,'FontName','Arial','Units','normalized');
 
         pause(0.001)
 
         try checkcon = dir(cache1);
+            cd(cache1,'submitted_data')
         catch
-            cache1 = ftp(ftp_ip1,ftp_user1,ftp_password);
+            try
+                cache1 = sftp(ftp_ip1,ftp_user1,"Password",ftp_password);
+            catch
+                try
+                    connectTimes = [1,2,3,5,10,60,60*12]; % minutes
+                    connectionEstablished = 0;
+                    for ij = 1:length(connectTimes)
+                        if connectionEstablished == 0
+                            if connectTimes(ij) == 1
+                                waitText = [' ',num2str(connectTimes(ij)),' minute.']
+                            else
+                                waitText = [' ',num2str(connectTimes(ij)),' minutes.']
+                            end
+                            set(lblSending,'Units','Pixels','Visible','on',...
+                                'String',{'Error connecting to server.';strcat('Trying again in',waitText)})
+                            pause(connectTimes(ij)*60)
+                            try
+                                cache1 = sftp(ftp_ip1,ftp_user1,"Password",ftp_password);
+                                connectionEstablished = 1;
+                                set(lblSending,'String','Sending data...')
+                            catch
+                            end
+                        end
+                    end
+                    if connectionEstablished == 0
+                        zz = abjfl; % if we made it through end of loop, cause an error to display error code below
+                    end
+                catch
+                    set(lblSending,'Visible','on',...
+                        'String',{'Error connecting to server. (code 031)';'Please try again later.'})
+                    while 1==1
+                        pause
+                    end
+                end
+            end
             cd(cache1,'CoralCache')
+            cd(cache1,'submitted_data')
         end
 
-        cd(cache1,'submitted_data')
+        %cd(cache1,'submitted_data')
         thisDir = dir(cache1);
         noDuplicate = 1;
         for iii = 1:length(thisDir)
@@ -2443,6 +4533,21 @@ htextAbout3 = uicontrol(UserFig,'Style','text','String',' ',...
                 set(lblOverwrite,'Visible','on')
                 noDuplicate = 0;
             end
+        end
+
+        try
+            submission_code = round(rand([1,4])*10);
+            submission_text = strcat([num2str(submission_code(1)),num2str(submission_code(2)),num2str(submission_code(3)),num2str(submission_code(4))]);
+            C = [{UserSetIn.String}, {datetime('now')}, {file2send}];
+            fid8 = fopen(fullfile(refPath,strcat('new_submission_attempt_',submission_text,'.csv')));
+            writecell(C,fullfile(refPath,strcat('new_submission_attempt_',submission_text,'.csv')));
+            pause(2)
+            mput(cache1,fullfile(refPath,strcat('new_submission_attempt_',submission_text,'.csv')));
+            try fclose(fid8);
+            catch
+            end
+            delete(fullfile(refPath,strcat('new_submission_attempt_',submission_text,'.csv')));
+        catch
         end
 
         thisWorked = 0;
@@ -2461,15 +4566,16 @@ htextAbout3 = uicontrol(UserFig,'Style','text','String',' ',...
         set(sendXrayIn,'Visible','on')
         set(getMetaDataIn,'Visible','on')
         set(sendMetaDataIn,'Visible','on')
+        %set(directSubmit0In,'Visible','on')
         set(sendVideoIn,'Visible','on')
         set(mainMenuIn,'Visible','on')
         set(lblSending,'Visible','off')
 
         close(cache1)
-        cache1 = ftp(ftp_ip1,ftp_user1,ftp_password);
+        cache1 = sftp(ftp_ip1,ftp_user1,"Password",ftp_password);
         cd(cache1,'CoralCache')
 
-        if thisWorked == 1
+        %if thisWorked == 1
             try
                 try mget(cache1,'submission_log.csv',strcat(refPath));
                 catch
@@ -2487,7 +4593,11 @@ htextAbout3 = uicontrol(UserFig,'Style','text','String',' ',...
                 submit_log_dates = submitLog{2};
                 submit_log_cores = submitLog{3};
                 submit_log_users{n_submit_log+1} = UserSetIn.String;
-                submit_log_dates{n_submit_log+1} = datetime('now');
+                if thisWorked == 1
+                    submit_log_dates{n_submit_log+1} = datetime('now');
+                else
+                    submit_log_dates{n_submit_log+1} = 'unsuccessful';
+                end
                 submit_log_cores{n_submit_log+1} = file2send;
                 C = [submit_log_users, submit_log_dates, submit_log_cores];
                 fid7 = fopen(fullfile(refPath,'submission_log.csv'));
@@ -2500,7 +4610,7 @@ htextAbout3 = uicontrol(UserFig,'Style','text','String',' ',...
                 delete(fullfile(refPath,'submission_log.csv'));
             catch
             end
-        end
+        %end
 
     end
 
@@ -2522,6 +4632,8 @@ htextAbout3 = uicontrol(UserFig,'Style','text','String',' ',...
         set(lblOverwrite,'Visible','off')
         set(lblUploadError,'Visible','off')
         set(lblUploadError2,'Visible','off')
+        set(directSubmit0In,'Visible','off')
+        
         pause(0.001)
 
         [file2send,selpath3] = uigetfile({'*.xlsx;*.csv;*.txt;*.xls'},'File Selector');
@@ -2529,16 +4641,52 @@ htextAbout3 = uicontrol(UserFig,'Style','text','String',' ',...
 
         set(lblGracious,'String',{'CoralCache depends on your data!';'Thank you for sharing your data to help this community effort.'})
 
-        lblSending = uicontrol(UserFig,'Style','text','String','Sending data...','Position',[200,80,500,20],...
+        lblSending = uicontrol(UserFig,'Style','text','String','Sending data...','Position',[200,80,500,40],...
             'BackgroundColor','none','FontSize',10,'FontName','Arial','Units','normalized');
 
         try checkcon = dir(cache1);
+            cd(cache1,'submitted_data')
         catch
-            cache1 = ftp(ftp_ip1,ftp_user1,ftp_password);
+            try
+                cache1 = sftp(ftp_ip1,ftp_user1,"Password",ftp_password);
+            catch
+                try
+                    connectTimes = [1,2,3,5,10,60,60*12]; % minutes
+                    connectionEstablished = 0;
+                    for ij = 1:length(connectTimes)
+                        if connectionEstablished == 0
+                            if connectTimes(ij) == 1
+                                waitText = [' ',num2str(connectTimes(ij)),' minute.']
+                            else
+                                waitText = [' ',num2str(connectTimes(ij)),' minutes.']
+                            end
+                            set(lblSending,'Units','Pixels','Visible','on',...
+                                'String',{'Error connecting to server.';strcat('Trying again in',waitText)})
+                            pause(connectTimes(ij)*60)
+                            try
+                                cache1 = sftp(ftp_ip1,ftp_user1,"Password",ftp_password);
+                                connectionEstablished = 1;
+                                set(lblSending,'String','Sending data...')
+                            catch
+                            end
+                        end
+                    end
+                    if connectionEstablished == 0
+                        zz = abjfl; % if we made it through end of loop, cause an error to display error code below
+                    end
+                catch
+                    set(lblSending,'Visible','on',...
+                        'String',{'Error connecting to server. (code 031)';'Please try again later.'})
+                    while 1==1
+                        pause
+                    end
+                end
+            end
             cd(cache1,'CoralCache')
+            cd(cache1,'submitted_data')
         end
 
-        cd(cache1,'submitted_data')
+        %cd(cache1,'submitted_data')
         thisDir = dir(cache1);
         noDuplicate = 1;
         for iii = 1:length(thisDir)
@@ -2546,6 +4694,21 @@ htextAbout3 = uicontrol(UserFig,'Style','text','String',' ',...
                 set(lblOverwrite,'Visible','on')
                 noDuplicate = 0;
             end
+        end
+
+        try
+            submission_code = round(rand([1,4])*10);
+            submission_text = strcat([num2str(submission_code(1)),num2str(submission_code(2)),num2str(submission_code(3)),num2str(submission_code(4))]);
+            C = [{UserSetIn.String}, {datetime('now')}, {file2send}];
+            fid8 = fopen(fullfile(refPath,strcat('new_submission_attempt_',submission_text,'.csv')));
+            writecell(C,fullfile(refPath,strcat('new_submission_attempt_',submission_text,'.csv')));
+            pause(2)
+            mput(cache1,fullfile(refPath,strcat('new_submission_attempt_',submission_text,'.csv')));
+            try fclose(fid8);
+            catch
+            end
+            delete(fullfile(refPath,strcat('new_submission_attempt_',submission_text,'.csv')));
+        catch
         end
 
         thisWorked = 0;
@@ -2567,11 +4730,12 @@ htextAbout3 = uicontrol(UserFig,'Style','text','String',' ',...
         set(sendVideoIn,'Visible','on')
         set(mainMenuIn,'Visible','on')
         set(lblSending,'Visible','off')
+        %set(directSubmit0In,'Visible','on')
 
         close(cache1)
-        cache1 = ftp(ftp_ip1,ftp_user1,ftp_password);
+        cache1 = sftp(ftp_ip1,ftp_user1,"Password",ftp_password);
         cd(cache1,'CoralCache');
-        if thisWorked == 1
+        %if thisWorked == 1
             try
                 try mget(cache1,'submission_log.csv',strcat(refPath));
                 catch
@@ -2589,7 +4753,11 @@ htextAbout3 = uicontrol(UserFig,'Style','text','String',' ',...
                 submit_log_dates = submitLog{2};
                 submit_log_cores = submitLog{3};
                 submit_log_users{n_submit_log+1} = UserSetIn.String;
-                submit_log_dates{n_submit_log+1} = datetime('now');
+                if thisWorked == 1
+                    submit_log_dates{n_submit_log+1} = datetime('now');
+                else
+                    submit_log_dates{n_submit_log+1} = 'unsuccessful';
+                end
                 submit_log_cores{n_submit_log+1} = file2send;
                 C = [submit_log_users, submit_log_dates, submit_log_cores];
                 fid7 = fopen(fullfile(refPath,'submission_log.csv'));
@@ -2602,7 +4770,7 @@ htextAbout3 = uicontrol(UserFig,'Style','text','String',' ',...
                 delete(fullfile(refPath,'submission_log.csv'));
             catch
             end
-        end
+        %end
 
     end
 
@@ -2622,6 +4790,7 @@ htextAbout3 = uicontrol(UserFig,'Style','text','String',' ',...
         set(lblOverwrite,'Visible','off')
         set(lblUploadError,'Visible','off')
         set(lblUploadError2,'Visible','off')
+        set(directSubmit0In,'Visible','off')
         pause(0.001)
 
         [file2send,selpath3] = uigetfile({'*.tiff;*.tif;*.png;*.jpg'},'File Selector');
@@ -2629,16 +4798,52 @@ htextAbout3 = uicontrol(UserFig,'Style','text','String',' ',...
 
         set(lblGracious,'String',{'CoralCache depends on your data!';'Thank you for sharing your data to help this community effort.'})
 
-        lblSending = uicontrol(UserFig,'Style','text','String','Sending data...','Position',[200,80,500,20],...
+        lblSending = uicontrol(UserFig,'Style','text','String','Sending data...','Position',[200,80,500,40],...
             'BackgroundColor','none','FontSize',10,'FontName','Arial','Units','normalized');
 
         try checkcon = dir(cache1);
+            cd(cache1,'submitted_data')
         catch
-            cache1 = ftp(ftp_ip1,ftp_user1,ftp_password);
+            try
+                cache1 = sftp(ftp_ip1,ftp_user1,"Password",ftp_password);
+            catch
+                try
+                    connectTimes = [1,2,3,5,10,60,60*12]; % minutes
+                    connectionEstablished = 0;
+                    for ij = 1:length(connectTimes)
+                        if connectionEstablished == 0
+                            if connectTimes(ij) == 1
+                                waitText = [' ',num2str(connectTimes(ij)),' minute.']
+                            else
+                                waitText = [' ',num2str(connectTimes(ij)),' minutes.']
+                            end
+                            set(lblSending,'Units','Pixels','Visible','on',...
+                                'String',{'Error connecting to server.';strcat('Trying again in',waitText)})
+                            pause(connectTimes(ij)*60)
+                            try
+                                cache1 = sftp(ftp_ip1,ftp_user1,"Password",ftp_password);
+                                connectionEstablished = 1;
+                                set(lblSending,'String','Sending data...')
+                            catch
+                            end
+                        end
+                    end
+                    if connectionEstablished == 0
+                        zz = abjfl; % if we made it through end of loop, cause an error to display error code below
+                    end
+                catch
+                    set(lblSending,'Visible','on',...
+                        'String',{'Error connecting to server. (code 031)';'Please try again later.'})
+                    while 1==1
+                        pause
+                    end
+                end
+            end
             cd(cache1,'CoralCache')
+            cd(cache1,'submitted_data')
         end
 
-        cd(cache1,'submitted_data')
+        %cd(cache1,'submitted_data')
         thisDir = dir(cache1);
         noDuplicate = 1;
         for iii = 1:length(thisDir)
@@ -2646,6 +4851,21 @@ htextAbout3 = uicontrol(UserFig,'Style','text','String',' ',...
                 set(lblOverwrite,'Visible','on')
                 noDuplicate = 0;
             end
+        end
+
+        try
+            submission_code = round(rand([1,4])*10);
+            submission_text = strcat([num2str(submission_code(1)),num2str(submission_code(2)),num2str(submission_code(3)),num2str(submission_code(4))]);
+            C = [{UserSetIn.String}, {datetime('now')}, {file2send}];
+            fid8 = fopen(fullfile(refPath,strcat('new_submission_attempt_',submission_text,'.csv')));
+            writecell(C,fullfile(refPath,strcat('new_submission_attempt_',submission_text,'.csv')));
+            pause(2)
+            mput(cache1,fullfile(refPath,strcat('new_submission_attempt_',submission_text,'.csv')));
+            try fclose(fid8);
+            catch
+            end
+            delete(fullfile(refPath,strcat('new_submission_attempt_',submission_text,'.csv')));
+        catch
         end
 
         thisWorked = 0;
@@ -2667,11 +4887,12 @@ htextAbout3 = uicontrol(UserFig,'Style','text','String',' ',...
         set(sendVideoIn,'Visible','on')
         set(mainMenuIn,'Visible','on')
         set(lblSending,'Visible','off')
+        %set(directSubmit0In,'Visible','on')
 
         close(cache1)
-        cache1 = ftp(ftp_ip1,ftp_user1,ftp_password);
+        cache1 = sftp(ftp_ip1,ftp_user1,"Password",ftp_password);
         cd(cache1,'CoralCache');
-        if thisWorked == 1
+        %if thisWorked == 1
             try
                 try mget(cache1,'submission_log.csv',strcat(refPath));
                 catch
@@ -2689,7 +4910,11 @@ htextAbout3 = uicontrol(UserFig,'Style','text','String',' ',...
                 submit_log_dates = submitLog{2};
                 submit_log_cores = submitLog{3};
                 submit_log_users{n_submit_log+1} = UserSetIn.String;
-                submit_log_dates{n_submit_log+1} = datetime('now');
+                if thisWorked == 1
+                    submit_log_dates{n_submit_log+1} = datetime('now');
+                else
+                    submit_log_dates{n_submit_log+1} = 'unsuccessful';
+                end
                 submit_log_cores{n_submit_log+1} = file2send;
                 C = [submit_log_users, submit_log_dates, submit_log_cores];
                 fid7 = fopen(fullfile(refPath,'submission_log.csv'));
@@ -2702,7 +4927,7 @@ htextAbout3 = uicontrol(UserFig,'Style','text','String',' ',...
                 delete(fullfile(refPath,'submission_log.csv'));
             catch
             end
-        end
+        %end
 
     end
 
@@ -2710,7 +4935,41 @@ htextAbout3 = uicontrol(UserFig,'Style','text','String',' ',...
 
         try checkcon = dir(cache1);
         catch
-            cache1 = ftp(ftp_ip1,ftp_user1,ftp_password);
+            try
+                cache1 = sftp(ftp_ip1,ftp_user1,"Password",ftp_password);
+            catch
+                try
+                    connectTimes = [1,2,3,5,10,60,60*12]; % minutes
+                    connectionEstablished = 0;
+                    for ij = 1:length(connectTimes)
+                        if connectionEstablished == 0
+                            if connectTimes(ij) == 1
+                                waitText = [' ',num2str(connectTimes(ij)),' minute.']
+                            else
+                                waitText = [' ',num2str(connectTimes(ij)),' minutes.']
+                            end
+                            set(lblThanksCT,'Units','Pixels','Visible','on',...
+                                'String',{'Error connecting to server.';strcat('Trying again in',waitText)})
+                            pause(connectTimes(ij)*60)
+                            try
+                                cache1 = sftp(ftp_ip1,ftp_user1,"Password",ftp_password);
+                                connectionEstablished = 1;
+                                set(lblThanksCT,'String','Downloading...')
+                            catch
+                            end
+                        end
+                    end
+                    if connectionEstablished == 0
+                        zz = abjfl; % if we made it through end of loop, cause an error to display error code below
+                    end
+                catch
+                    set(lblThanksCT,'Visible','on',...
+                        'String',{'Error connecting to server. (code 032)';'Please try again later.'})
+                    while 1==1
+                        pause
+                    end
+                end
+            end
             cd(cache1,'CoralCache')
         end
 
@@ -2724,6 +4983,7 @@ htextAbout3 = uicontrol(UserFig,'Style','text','String',' ',...
             end
             set(lblThanksCT,'Visible','on','String','Check your downloads folder.')
         catch
+            set(lblThanksCT,'Visible','on','String',{'Download unsuccessful.';'Go to www.coralct.org'})
         end
 
     end
@@ -2757,6 +5017,7 @@ htextAbout3 = uicontrol(UserFig,'Style','text','String',' ',...
         set(lblOverwrite,'Visible','off')
         set(lblUploadError,'Visible','off')
         set(lblUploadError2,'Visible','off')
+        set(directSubmit0In,'Visible','off')
         pause(0.001)
 
         [file2send,selpath3] = uigetfile({'*.avi;*.mov;*.mp4;*.ogg;*.oga'},'File Selector');
@@ -2764,18 +5025,54 @@ htextAbout3 = uicontrol(UserFig,'Style','text','String',' ',...
 
         set(lblGracious,'String',{'CoralCache depends on your data!';'Thank you for sharing your data to help this community effort.'})
 
-        lblSending = uicontrol(UserFig,'Style','text','String','Sending data...','Position',[720,80,250,20],...
+        lblSending = uicontrol(UserFig,'Style','text','String','Sending data...','Position',[720,80,250,40],...
             'BackgroundColor','none','FontSize',10,'FontName','Arial','Units','normalized');
 
         pause(0.001)
 
         try checkcon = dir(cache1);
+            cd(cache1,'submitted_data')
         catch
-            cache1 = ftp(ftp_ip1,ftp_user1,ftp_password);
+            try
+                cache1 = sftp(ftp_ip1,ftp_user1,"Password",ftp_password);
+            catch
+                try
+                    connectTimes = [1,2,3,5,10,60,60*12]; % minutes
+                    connectionEstablished = 0;
+                    for ij = 1:length(connectTimes)
+                        if connectionEstablished == 0
+                            if connectTimes(ij) == 1
+                                waitText = [' ',num2str(connectTimes(ij)),' minute.']
+                            else
+                                waitText = [' ',num2str(connectTimes(ij)),' minutes.']
+                            end
+                            set(lblSending,'Units','Pixels','Visible','on',...
+                                'String',{'Error connecting to server.';strcat('Trying again in',waitText)})
+                            pause(connectTimes(ij)*60)
+                            try
+                                cache1 = sftp(ftp_ip1,ftp_user1,"Password",ftp_password);
+                                connectionEstablished = 1;
+                                set(lblSending,'String','Sending data...')
+                            catch
+                            end
+                        end
+                    end
+                    if connectionEstablished == 0
+                        zz = abjfl; % if we made it through end of loop, cause an error to display error code below
+                    end
+                catch
+                    set(lblSending,'Visible','on',...
+                        'String',{'Error connecting to server. (code 031)';'Please try again later.'})
+                    while 1==1
+                        pause
+                    end
+                end
+            end
             cd(cache1,'CoralCache')
+            cd(cache1,'submitted_data')
         end
 
-        cd(cache1,'submitted_data')
+        %cd(cache1,'submitted_data')
         thisDir = dir(cache1);
         noDuplicate = 1;
         for iii = 1:length(thisDir)
@@ -2803,10 +5100,11 @@ htextAbout3 = uicontrol(UserFig,'Style','text','String',' ',...
         set(sendMetaDataIn,'Visible','on')
         set(sendVideoIn,'Visible','on')
         set(mainMenuIn,'Visible','on')
+        %set(directSubmit0In,'Visible','on')
         set(lblSending,'Visible','off')
 
         close(cache1)
-        cache1 = ftp(ftp_ip1,ftp_user1,ftp_password);
+        cache1 = sftp(ftp_ip1,ftp_user1,"Password",ftp_password);
         cd(cache1,'CoralCache')
 
         if thisWorked == 1
@@ -2850,6 +5148,7 @@ h_map1 = uiaxes(UserFig,'Units','Pixels','Position',[100 395 450 275],'Color','n
 h_map1.InteractionOptions.DatatipsSupported = 'off';
 h_map1.InteractionOptions.ZoomSupported = "off";
 h_map1.InteractionOptions.PanSupported = "off";
+h_map1.Toolbar.Visible = 'off';
 figtemp1 = figure('Visible','off','Units','pixels');
 figtemp2 = figure('Visible','off','Units','pixels');
 pRegionMap = [];
@@ -2867,7 +5166,9 @@ h_map2 = uiaxes(UserFig,'Units','Pixels','Position',[100 75 450 275],'Visible','
 h_map2.InteractionOptions.DatatipsSupported = 'off';
 h_map2.InteractionOptions.ZoomSupported = "off";
 h_map2.InteractionOptions.PanSupported = "off";
+h_map2.Toolbar.Visible = 'off';
 
+lblMapClick = [];
     function updateMap
         set(h_preview,'Visible','off') % turn off the preview axes since it will cover the maps
         set(h_map_cover,'Visible','off') % turn off the preview axes since it will cover the maps
@@ -2907,8 +5208,11 @@ h_map2.InteractionOptions.PanSupported = "off";
             if ~strcmp(latestMap2,currentSubRegion)
                 addSubRegionBox
                 delete(h_map1.Children)
+                try
                 axcopy = copyobj(pRegionMap.Children,h_map1);
                 h_map1.PlotBoxAspectRatio = pRegionMap.PlotBoxAspectRatio;
+                catch
+                end
             end
         else % otherwise, plot worldmap
             % do we already have it plotted?
@@ -2932,8 +5236,11 @@ h_map2.InteractionOptions.PanSupported = "off";
                 % plot the region here
                 plotSubRegion
                 delete(h_map2.Children)
+                try
                 axcopy = copyobj(pSubRegionMap.Children,h_map2);
                 h_map2.PlotBoxAspectRatio = pSubRegionMap.PlotBoxAspectRatio;
+                catch
+                end
 
                 % keep track of what was most recently plotted
                 latestMap2 = currentSubRegion;
@@ -2945,8 +5252,11 @@ h_map2.InteractionOptions.PanSupported = "off";
                 plotRegion
 
                 delete(h_map2.Children)
+                try
                 axcopy = copyobj(pRegionMap.Children,h_map2);
                 h_map2.PlotBoxAspectRatio = pRegionMap.PlotBoxAspectRatio;
+                catch
+                end
 
                 % keep track of what was most recently plotted
                 latestMap2 = currentRegion;
@@ -2956,14 +5266,17 @@ h_map2.InteractionOptions.PanSupported = "off";
         % If a core is selected, plot it in a larger blue dot
         if length(coralName)>0 && ~strcmp(coralName,'Download all')
             dir_idx = find(strcmp(coralDir.textdata(2:end,1),coralName));
-            pCore = plotm(coralDir.data(dir_idx(1),3),coralDir.data(dir_idx(1),4),'ko','MarkerEdgeColor','k', 'MarkerFaceColor',[0.2,0.2,0.8],'MarkerSize',12);
-            delete(h_map2.Children)
-            if length(currentSubRegion{1})>1 % subregion exists
-                axcopy = copyobj(pSubRegionMap.Children,h_map2);
-                h_map2.PlotBoxAspectRatio = pSubRegionMap.PlotBoxAspectRatio;
-            else % only region
-                axcopy = copyobj(pRegionMap.Children,h_map2);
-                h_map2.PlotBoxAspectRatio = pRegionMap.PlotBoxAspectRatio;
+            try
+                pCore = plotm(coralDir.data(dir_idx(1),3),coralDir.data(dir_idx(1),4),'ko','MarkerEdgeColor','k', 'MarkerFaceColor',[0.2,0.2,0.8],'MarkerSize',12);
+                delete(h_map2.Children)
+                if length(currentSubRegion{1})>1 % subregion exists
+                    axcopy = copyobj(pSubRegionMap.Children,h_map2);
+                    h_map2.PlotBoxAspectRatio = pSubRegionMap.PlotBoxAspectRatio;
+                else % only region
+                    axcopy = copyobj(pRegionMap.Children,h_map2);
+                    h_map2.PlotBoxAspectRatio = pRegionMap.PlotBoxAspectRatio;
+                end
+            catch
             end
         end
 
@@ -2985,33 +5298,90 @@ h_map2.InteractionOptions.PanSupported = "off";
         catch
             try load(fullfile(selpath,'my_map_data',strcat('shorelines_',currentRegion{1},'.mat')),'shorelines','boxLat','boxLon')
             catch
-                %cache = ftp(ftp_ip,'CoralCache_beta','Corals1234'); %
+                %cache = sftp(ftp_ip,'CoralCache_beta','Corals1234'); %
                 regionfile = double(currentRegion{1});
-                if length(find(regionfile==32)) > 0
-                    regionfile(regionfile==32) = 95;
-                    regionfile = char(regionfile);
-                    mget(cache1,strcat('shorelines_',regionfile,'.mat'),fullfile(selpath,'my_map_data'));
-                    load(fullfile(selpath,'my_map_data',strcat('shorelines_',regionfile,'.mat')),'shorelines','boxLat','boxLon')
-                    save(fullfile(selpath,'my_map_data',strcat('shorelines_',currentRegion{1},'.mat')),'shorelines','boxLat','boxLon')
-                    delete(fullfile(selpath,'my_map_data',strcat('shorelines_',regionfile,'.mat')))
-                else
-                    mget(cache1,strcat('shorelines_',currentRegion{1},'.mat'),fullfile(selpath,'my_map_data'));
-                    load(fullfile(selpath,'my_map_data',strcat('shorelines_',currentRegion{1},'.mat')),'shorelines','boxLat','boxLon')
+                dMap = dir(cache1);
+                map_names = {''};
+                for jjjj = 1:length(dMap)
+                    map_names{jjjj} = char(dMap(jjjj).name);
                 end
-                close(cache1)
-                cache1 = ftp(ftp_ip1,ftp_user1,ftp_password);
-                cd(cache1,'CoralCache')
+                try
+                    if length(find(regionfile==32)) > 0
+                        regionfile(regionfile==32) = 95;
+                        regionfile = char(regionfile);
+                        if max(strcmp(strcat('shorelines_',regionfile,'.mat'),map_names))
+                            mget(cache1,strcat('shorelines_',regionfile,'.mat'),fullfile(selpath,'my_map_data'));
+                            load(fullfile(selpath,'my_map_data',strcat('shorelines_',regionfile,'.mat')),'shorelines','boxLat','boxLon')
+                            save(fullfile(selpath,'my_map_data',strcat('shorelines_',currentRegion{1},'.mat')),'shorelines','boxLat','boxLon')
+                            delete(fullfile(selpath,'my_map_data',strcat('shorelines_',regionfile,'.mat')))
+                        else
+                            set(lblMapClick,'Visible','on','String','Map unavailable')
+                            pause(0.01)
+                        end
+                    else
+                        if max(strcmp(strcat('shorelines_',currentRegion{1},'.mat'),map_names))
+                            mget(cache1,strcat('shorelines_',currentRegion{1},'.mat'),fullfile(selpath,'my_map_data'));
+                            load(fullfile(selpath,'my_map_data',strcat('shorelines_',currentRegion{1},'.mat')),'shorelines','boxLat','boxLon')
+                        else
+                            set(lblMapClick,'Visible','on','String','Map unavailable')
+                            pause(0.01)
+                        end
+                    end
+                catch
+                end
+                try
+                    close(cache1)
+                    cache1 = sftp(ftp_ip1,ftp_user1,"Password",ftp_password);
+                    cd(cache1,'CoralCache')
+                catch
+                    try
+                        connectTimes = [1,2,3,5,10,60,60*12]; % minutes
+                        connectionEstablished = 0;
+                        for ij = 1:length(connectTimes)
+                            if connectionEstablished == 0
+                                if connectTimes(ij) == 1
+                                    waitText = [' ',num2str(connectTimes(ij)),' minute.']
+                                else
+                                    waitText = [' ',num2str(connectTimes(ij)),' minutes.']
+                                end
+                                set(lblVerifying,'Units','Pixels','Visible','on',...
+                                    'String',{'Error connecting to server.';strcat('Trying again in',waitText)})
+                                pause(connectTimes(ij)*60)
+                                try
+                                    cache1 = sftp(ftp_ip1,ftp_user1,"Password",ftp_password);
+                                    cd(cache1,'CoralCache')
+                                    connectionEstablished = 1;
+                                    set(lblVerifying,'Visible','off')
+                                catch
+                                end
+                            end
+                        end
+                        if connectionEstablished == 0
+                            zz = abjfl; % if we made it through end of loop, cause an error to display error code below
+                        end
+                    catch
+                        set(lblVerifying,'Visible','on',...
+                            'String',{'Error connecting to server. (code 041)';'Please try again later.'})
+                        while 1==1
+                            pause
+                        end
+                    end
+                end
             end
         end
-        pRegionMap = worldmap(boxLat,boxLon);
+        try
+            pRegionMap = worldmap(boxLat,boxLon);
 
-        hold on
+            hold on
 
-        for i = 1:length(shorelines)
-            patchm(shorelines(i).Lat(1:end-1),shorelines(i).Lon(1:end-1),[0 0 0])
+            for i = 1:length(shorelines)
+                patchm(shorelines(i).Lat(1:end-1),shorelines(i).Lon(1:end-1),[0 0 0])
+            end
+            plotm(coralDir.data(:,3),coralDir.data(:,4),'ko','MarkerEdgeColor','k', 'MarkerFaceColor',[0.96,0.51,0.58],'MarkerSize',10);
+        catch
+            set(lblMapClick,'Visible','on','String','Map unavailable')
+            pause(0.01)
         end
-        plotm(coralDir.data(:,3),coralDir.data(:,4),'ko','MarkerEdgeColor','k', 'MarkerFaceColor',[0.96,0.51,0.58],'MarkerSize',10);
-
 
     end
 
@@ -3021,33 +5391,91 @@ h_map2.InteractionOptions.PanSupported = "off";
         catch
             try load(fullfile(selpath,'my_map_data',strcat('shorelines_',currentSubRegion{1},'.mat')),'shorelines','boxLat','boxLon')
             catch
-                %cache = ftp(ftp_ip,'CoralCache_beta','Corals1234'); %
+                %cache = sftp(ftp_ip,'CoralCache_beta','Corals1234'); %
                 cd(cache1,'shorelines');
                 subregionfile = double(currentSubRegion{1});
-                if length(find(subregionfile==32)) > 0
-                    subregionfile(subregionfile==32) = 95;
-                    subregionfile = char(subregionfile);
-                    mget(cache1,strcat('shorelines_',subregionfile,'.mat'),fullfile(selpath,'my_map_data'));
-                    load(fullfile(selpath,'my_map_data',strcat('shorelines_',subregionfile,'.mat')),'shorelines','boxLat','boxLon')
-                    save(fullfile(selpath,'my_map_data',strcat('shorelines_',currentSubRegion{1},'.mat')),'shorelines','boxLat','boxLon')
-                    delete(fullfile(selpath,'my_map_data',strcat('shorelines_',subregionfile,'.mat')))
-                else
-                    mget(cache1,strcat('shorelines_',currentSubRegion{1},'.mat'),fullfile(selpath,'my_map_data'));
-                    load(fullfile(selpath,'my_map_data',strcat('shorelines_',currentSubRegion{1},'.mat')),'shorelines','boxLat','boxLon')
+                dMap = dir(cache1);
+                map_names = {''};
+                for jjjj = 1:length(dMap)
+                    map_names{jjjj} = char(dMap(jjjj).name);
                 end
-                close(cache1)
-                cache1 = ftp(ftp_ip1,ftp_user1,ftp_password);
-                cd(cache1,'CoralCache')
+                try
+                    if length(find(subregionfile==32)) > 0
+                        subregionfile(subregionfile==32) = 95;
+                        subregionfile = char(subregionfile);
+                        if max(strcmp(strcat('shorelines_',subregionfile,'.mat'),map_names))
+                            mget(cache1,strcat('shorelines_',subregionfile,'.mat'),fullfile(selpath,'my_map_data'));
+                            load(fullfile(selpath,'my_map_data',strcat('shorelines_',subregionfile,'.mat')),'shorelines','boxLat','boxLon')
+                            save(fullfile(selpath,'my_map_data',strcat('shorelines_',currentSubRegion{1},'.mat')),'shorelines','boxLat','boxLon')
+                            delete(fullfile(selpath,'my_map_data',strcat('shorelines_',subregionfile,'.mat')))
+                        else
+                            set(lblMapClick,'Visible','on','String','Map unavailable')
+                            pause(0.01)
+                        end
+                    else
+                        if max(strcmp(strcat('shorelines_',currentSubRegion{1},'.mat'),map_names))
+                            mget(cache1,strcat('shorelines_',currentSubRegion{1},'.mat'),fullfile(selpath,'my_map_data'));
+                            load(fullfile(selpath,'my_map_data',strcat('shorelines_',currentSubRegion{1},'.mat')),'shorelines','boxLat','boxLon')
+                        else
+                            set(lblMapClick,'Visible','on','String','Map unavailable')
+                            pause(0.01)
+                        end
+                    end
+                catch
+                end
+                try
+                    close(cache1)
+                    cache1 = sftp(ftp_ip1,ftp_user1,"Password",ftp_password);
+                    cd(cache1,'CoralCache')
+                catch
+                    try
+                        connectTimes = [1,2,3,5,10,60,60*12]; % minutes
+                        connectionEstablished = 0;
+                        for ij = 1:length(connectTimes)
+                            if connectionEstablished == 0
+                                if connectTimes(ij) == 1
+                                    waitText = [' ',num2str(connectTimes(ij)),' minute.']
+                                else
+                                    waitText = [' ',num2str(connectTimes(ij)),' minutes.']
+                                end
+                                set(lblVerifying,'Units','Pixels','Visible','on',...
+                                    'String',{'Error connecting to server.';strcat('Trying again in',waitText)})
+                                pause(connectTimes(ij)*60)
+                                try
+                                    cache1 = sftp(ftp_ip1,ftp_user1,"Password",ftp_password);
+                                    cd(cache1,'CoralCache')
+                                    connectionEstablished = 1;
+                                    set(lblVerifying,'Visible','off')
+                                catch
+                                end
+                            end
+                        end
+                        if connectionEstablished == 0
+                            zz = abjfl; % if we made it through end of loop, cause an error to display error code below
+                        end
+                    catch
+                        set(lblVerifying,'Visible','on',...
+                            'String',{'Error connecting to server. (code 041)';'Please try again later.'})
+                        while 1==1
+                            pause
+                        end
+                    end
+                end
             end
         end
-        pSubRegionMap = worldmap(boxLat,boxLon);
+        try
+            pSubRegionMap = worldmap(boxLat,boxLon);
 
-        hold on
+            hold on
 
-        for i = 1:length(shorelines)
-            patchm(shorelines(i).Lat(1:end-1),shorelines(i).Lon(1:end-1),[0 0 0])
+            for i = 1:length(shorelines)
+                patchm(shorelines(i).Lat(1:end-1),shorelines(i).Lon(1:end-1),[0 0 0])
+            end
+            plotm(coralDir.data(:,3),coralDir.data(:,4),'ko','MarkerEdgeColor','k', 'MarkerFaceColor',[0.96,0.51,0.58],'MarkerSize',10);
+        catch
+            set(lblMapClick,'Visible','on','String','Map unavailable')
+            pause(0.01)
         end
-        plotm(coralDir.data(:,3),coralDir.data(:,4),'ko','MarkerEdgeColor','k', 'MarkerFaceColor',[0.96,0.51,0.58],'MarkerSize',10);
 
     end
 
@@ -3057,7 +5485,9 @@ h_map2.InteractionOptions.PanSupported = "off";
         plabel('off')
         mlabel('off')
         hold on
-        geoshow('landareas.shp', 'FaceColor', [0 0 0])
+        %geoshow('landareas.shp', 'FaceColor', [0 0 0])
+        load('coastlines.mat')
+        patchm(coastlat,coastlon,'k','EdgeColor','none')
         plotm(coralDir.data(:,3),coralDir.data(:,4),'ko','MarkerEdgeColor','k', 'MarkerFaceColor',[0.96,0.51,0.58]);
 
     end
@@ -3072,30 +5502,92 @@ h_map2.InteractionOptions.PanSupported = "off";
         catch
             try load(fullfile(selpath,'my_map_data',strcat('shorelines_',currentRegion{1},'.mat')),'boxLat','boxLon')
             catch
-                %cache = ftp(ftp_ip,'CoralCache_beta','Corals1234'); %
-                cd(cache1,'shorelines');
+                %cache = sftp(ftp_ip,'CoralCache_beta','Corals1234'); %
+                try cd(cache1,'shorelines');
+                catch
+                    try cd(cache1,'CoralCache')
+                        cd(cache1,'shorelines');
+                    catch
+                        cache1 = sftp(ftp_ip1,ftp_user1,"Password",ftp_password);
+                        cd(cache1,'CoralCache')
+                        cd(cache1,'shorelines');
+                    end
+                end
                 regionfile = double(currentRegion{1});
+                dMap = dir(cache1);
+                map_names = {''};
+                for jjjj = 1:length(dMap)
+                    map_names{jjjj} = char(dMap(jjjj).name);
+                end
                 if length(find(regionfile==32)) > 0
                     regionfile(regionfile==32) = 95;
                     regionfile = char(regionfile);
-                    mget(cache1,strcat('shorelines_',regionfile,'.mat'),fullfile(selpath,'my_map_data'));
-                    load(fullfile(selpath,'my_map_data',strcat('shorelines_',regionfile,'.mat')),'shorelines','boxLat','boxLon')
-                    save(fullfile(selpath,'my_map_data',strcat('shorelines_',currentRegion{1},'.mat')),'shorelines','boxLat','boxLon')
-                    delete(fullfile(selpath,'my_map_data',strcat('shorelines_',regionfile,'.mat')))
+                    if max(strcmp(strcat('shorelines_',regionfile,'.mat'),map_names))
+                        mget(cache1,strcat('shorelines_',regionfile,'.mat'),fullfile(selpath,'my_map_data'));
+                        load(fullfile(selpath,'my_map_data',strcat('shorelines_',regionfile,'.mat')),'shorelines','boxLat','boxLon')
+                        save(fullfile(selpath,'my_map_data',strcat('shorelines_',currentRegion{1},'.mat')),'shorelines','boxLat','boxLon')
+                        delete(fullfile(selpath,'my_map_data',strcat('shorelines_',regionfile,'.mat')))
+                    else
+                        set(lblMapClick,'Visible','on','String','Map unavailable')
+                        pause(0.01)
+                    end
                 else
-                    mget(cache1,strcat('shorelines_',currentRegion{1},'.mat'),fullfile(selpath,'my_map_data'));
-                    load(fullfile(selpath,'my_map_data',strcat('shorelines_',currentRegion{1},'.mat')),'shorelines','boxLat','boxLon')
+                    if max(strcmp(strcat('shorelines_',currentRegion{1},'.mat'),map_names))
+                        mget(cache1,strcat('shorelines_',currentRegion{1},'.mat'),fullfile(selpath,'my_map_data'));
+                        load(fullfile(selpath,'my_map_data',strcat('shorelines_',currentRegion{1},'.mat')),'shorelines','boxLat','boxLon')
+                    else
+                        set(lblMapClick,'Visible','on','String','Map unavailable')
+                        pause(0.01)
+                    end
                 end
-                close(cache1)
-                cache1 = ftp(ftp_ip1,ftp_user1,ftp_password);
-                cd(cache1,'CoralCache')
+                try
+                    close(cache1)
+                    cache1 = sftp(ftp_ip1,ftp_user1,"Password",ftp_password);
+                    cd(cache1,'CoralCache')
+                catch
+                    try
+                        connectTimes = [1,2,3,5,10,60,60*12]; % minutes
+                        connectionEstablished = 0;
+                        for ij = 1:length(connectTimes)
+                            if connectionEstablished == 0
+                                if connectTimes(ij) == 1
+                                    waitText = [' ',num2str(connectTimes(ij)),' minute.']
+                                else
+                                    waitText = [' ',num2str(connectTimes(ij)),' minutes.']
+                                end
+                                set(lblVerifying,'Units','Pixels','Visible','on',...
+                                    'String',{'Error connecting to server.';strcat('Trying again in',waitText)})
+                                pause(connectTimes(ij)*60)
+                                try
+                                    cache1 = sftp(ftp_ip1,ftp_user1,"Password",ftp_password);
+                                    cd(cache1,'CoralCache')
+                                    connectionEstablished = 1;
+                                    set(lblVerifying,'Visible','off')
+                                catch
+                                end
+                            end
+                        end
+                        if connectionEstablished == 0
+                            zz = abjfl; % if we made it through end of loop, cause an error to display error code below
+                        end
+                    catch
+                        set(lblVerifying,'Visible','on',...
+                            'String',{'Error connecting to server. (code 041)';'Please try again later.'})
+                        while 1==1
+                            pause
+                        end
+                    end
+                end
             end
         end
 
+        try
         pRegion = plotm([boxLat(1),boxLat(1),boxLat(2),boxLat(2),boxLat(1)],...
             [boxLon(1),boxLon(2),boxLon(2),boxLon(1),boxLon(1)],'r-','LineWidth',2);
 
         regionBoxExists = 1;
+        catch
+        end
 
     end
 
@@ -3110,31 +5602,86 @@ h_map2.InteractionOptions.PanSupported = "off";
         catch
             try load(fullfile(selpath,'my_map_data',strcat('shorelines_',currentSubRegion{1},'.mat')),'boxLat','boxLon')
             catch
-                %cache = ftp(ftp_ip,'CoralCache_beta','Corals1234'); %
+                %cache = sftp(ftp_ip,'CoralCache_beta','Corals1234'); %
+                cache1 = sftp(ftp_ip1,ftp_user1,"Password",ftp_password);
+                cd(cache1,'CoralCache')
                 cd(cache1,'shorelines');
                 subregionfile = double(currentSubRegion{1});
+                dMap = dir(cache1);
+                map_names = {''};
+                for jjjj = 1:length(dMap)
+                    map_names{jjjj} = char(dMap(jjjj).name);
+                end
                 if length(find(subregionfile==32)) > 0
                     subregionfile(subregionfile==32) = 95;
                     subregionfile = char(subregionfile);
-                    mget(cache1,strcat('shorelines_',subregionfile,'.mat'),fullfile(selpath,'my_map_data'));
-                    load(fullfile(selpath,'my_map_data',strcat('shorelines_',subregionfile,'.mat')),'shorelines','boxLat','boxLon')
-                    save(fullfile(selpath,'my_map_data',strcat('shorelines_',currentSubRegion{1},'.mat')),'shorelines','boxLat','boxLon')
-                    delete(fullfile(selpath,'my_map_data',strcat('shorelines_',subregionfile,'.mat')))
+                    if max(strcmp(strcat('shorelines_',subregionfile,'.mat'),map_names))
+                        mget(cache1,strcat('shorelines_',subregionfile,'.mat'),fullfile(selpath,'my_map_data'));
+                        load(fullfile(selpath,'my_map_data',strcat('shorelines_',subregionfile,'.mat')),'shorelines','boxLat','boxLon')
+                        save(fullfile(selpath,'my_map_data',strcat('shorelines_',currentSubRegion{1},'.mat')),'shorelines','boxLat','boxLon')
+                        delete(fullfile(selpath,'my_map_data',strcat('shorelines_',subregionfile,'.mat')))
+                    else
+                        set(lblMapClick,'Visible','on','String','Map unavailable')
+                        pause(0.01)
+                    end
                 else
-                    mget(cache1,strcat('shorelines_',currentSubRegion{1},'.mat'),fullfile(selpath,'my_map_data'));
-                    load(fullfile(selpath,'my_map_data',strcat('shorelines_',currentSubRegion{1},'.mat')),'shorelines','boxLat','boxLon')
+                    if max(strcmp(strcat('shorelines_',currentSubRegion{1},'.mat'),map_names))
+                        mget(cache1,strcat('shorelines_',currentSubRegion{1},'.mat'),fullfile(selpath,'my_map_data'));
+                        load(fullfile(selpath,'my_map_data',strcat('shorelines_',currentSubRegion{1},'.mat')),'shorelines','boxLat','boxLon')
+                    else
+                        set(lblMapClick,'Visible','on','String','Map unavailable')
+                        pause(0.01)
+                    end
                 end
-                close(cache1)
-                cache1 = ftp(ftp_ip1,ftp_user1,ftp_password);
-                cd(cache1,'CoralCache')
+                try
+                    close(cache1)
+                    cache1 = sftp(ftp_ip1,ftp_user1,"Password",ftp_password);
+                    cd(cache1,'CoralCache')
+                catch
+                    try
+                        connectTimes = [1,2,3,5,10,60,60*12]; % minutes
+                        connectionEstablished = 0;
+                        for ij = 1:length(connectTimes)
+                            if connectionEstablished == 0
+                                if connectTimes(ij) == 1
+                                    waitText = [' ',num2str(connectTimes(ij)),' minute.']
+                                else
+                                    waitText = [' ',num2str(connectTimes(ij)),' minutes.']
+                                end
+                                set(lblVerifying,'Units','Pixels','Visible','on',...
+                                    'String',{'Error connecting to server.';strcat('Trying again in',waitText)})
+                                pause(connectTimes(ij)*60)
+                                try
+                                    cache1 = sftp(ftp_ip1,ftp_user1,"Password",ftp_password);
+                                    cd(cache1,'CoralCache')
+                                    connectionEstablished = 1;
+                                    set(lblVerifying,'Visible','off')
+                                catch
+                                end
+                            end
+                        end
+                        if connectionEstablished == 0
+                            zz = abjfl; % if we made it through end of loop, cause an error to display error code below
+                        end
+                    catch
+                        set(lblVerifying,'Visible','on',...
+                            'String',{'Error connecting to server. (code 041)';'Please try again later.'})
+                        while 1==1
+                            pause
+                        end
+                    end
+                end
             end
         end
 
+        try
         %once you define lat long box this will plot it
         pRegion = plotm([boxLat(1),boxLat(1),boxLat(2),boxLat(2),boxLat(1)],...
             [boxLon(1),boxLon(2),boxLon(2),boxLon(1),boxLon(1)],'r-','LineWidth',2);
 
         regionBoxExists = 1;
+        catch
+        end
 
     end
 
@@ -3224,6 +5771,7 @@ openLastIn = uicontrol(UserFig,'Style','pushbutton',...
         set(previewIn,'Visible','off')
         set(htextUser,'Visible','off')
         if strcmp(CoralCTformat,'mchips') || strcmp(CoralCTformat,'windows')
+            set(saveLogin, 'Visible','off')
             set(userProfileIn,'Visible','off')
             set(coreDirIn,'Visible','off')
         end
@@ -3246,6 +5794,7 @@ openLastIn = uicontrol(UserFig,'Style','pushbutton',...
         set(getDataIn,'Visible','off')
         set(downloadTimePreview,'Visible','off')
         set(SubmitDataIn,'Visible','off')
+        set(calibCurveIn,'Visible','off')
         set(htextLink4,'Visible','off')
 
         map_cover = patch(h_map_cover,[0,1],[0,1],themeColor2,'EdgeColor','none');
@@ -3399,6 +5948,7 @@ openChooseIn = uicontrol(UserFig,'Style','pushbutton',...
         set(previewIn,'Visible','off')
         set(htextUser,'Visible','off')
         if strcmp(CoralCTformat,'mchips') || strcmp(CoralCTformat,'windows')
+            set(saveLogin, 'Visible','off')
             set(userProfileIn,'Visible','off')
             set(coreDirIn,'Visible','off')
         end
@@ -3423,6 +5973,7 @@ openChooseIn = uicontrol(UserFig,'Style','pushbutton',...
         set(getDataIn,'Visible','off')
         set(downloadTimePreview,'Visible','off')
         set(SubmitDataIn,'Visible','off')
+        set(calibCurveIn,'Visible','off')
         set(htextLink4,'Visible','off')
 
         map_cover = patch(h_map_cover,[0,1],[0,1],themeColor2,'EdgeColor','none');
@@ -3442,6 +5993,17 @@ openChooseIn = uicontrol(UserFig,'Style','pushbutton',...
 
         coralName = thisFolderName;
         sectionName = '';
+
+        try coreInfo = importdata(fullfile(selpath,'my_corals',coralName,sectionName,'dicoms','CoreMetaData.csv'));
+            ct = 1;
+        catch
+            try coreInfo = importdata(fullfile(selpath,'my_corals',coralName,sectionName,'Xray','CoreMetaData.csv'));
+                ct = 0;
+            catch
+                set(lblOpeningError,'Visible','on','String','Cannot find metadata file')
+                pause
+            end
+        end
 
         saveName = strcat(saveFileName,'_');
 
@@ -3912,7 +6474,7 @@ areDataUnlocked = [];
                 for jjj = 1:length(dataOwner)
                     dataOwners(jjj,1:length(strsplit(dataOwner{jjj},'//'))) = strsplit(dataOwner{jjj},'//');
                 end
-                if coralDir.data(theseSections(jj),9) == 1 || any(strcmp(saveFileName,dataOwners),2) %zz
+                if coralDir.data(theseSections(jj),9) == 1 || any(strcmp(saveFileName,dataOwners),2) 
                     coralName = coralDir.textdata{theseSections(jj)+1,1};
                     sectionName = coralDir.textdata{theseSections(jj)+1,2};
                     dirOut = findBandFiles(coralName,sectionName);
@@ -3972,12 +6534,12 @@ checkSpeedIn = uicontrol(UserFig,'Style','pushbutton',...
 
         pause(0.01)
 
-        h_drive = 'hd1';
+        h_drive = '/hd1/';
 
         thisCoralName = 'F53B';
         test_row = find(strcmp(coralDir.textdata(:,1),thisCoralName));
 
-        try cache2 = ftp(ftp_ip2,ftp_user2,ftp_password); %
+        try cache2 = sftp(ftp_ip2,ftp_user2,"Password",ftp_password) %
         catch
             set(lblFTPerror,'Visible','on')
         end
@@ -4166,6 +6728,7 @@ p_preview = [];
 preview_exists = 0;
 preview_failed = 0;
 screenshot_failed = 0;
+viewScreenshotsIn = [];
 
     function preview_fun(src,event)
 
@@ -4175,7 +6738,7 @@ screenshot_failed = 0;
                 set(h_map_cover,'Visible','on');
                 patch(h_map_cover,[0,1],[0,1],themeColor2,'EdgeColor','none')
 
-                %cache = ftp(ftp_ip,'CoralCache_beta','Corals1234'); %
+                %cache = sftp(ftp_ip,'CoralCache_beta','Corals1234'); %
                 %cd(cache,'/hd1/CoralCache');
 
                 preview_img = imread(fullfile(selpath,'my_corals','preview_images',strcat(coralName,'_',sectionName,'.png')));
@@ -4206,10 +6769,11 @@ screenshot_failed = 0;
     function viewScreenshots(source,eventdata)
         screenshot_failed = 1;
         try
-
+            set(viewScreenshotsIn,'Enable','off')
+            drawnow
             thisSectionName = sectionName;
             thisCoralName = coralName;
-            h_drive = 'hd1';
+            h_drive = '/hd1/';
             serverChoice = 1;
 
             dirRow = 0;
@@ -4231,34 +6795,59 @@ screenshot_failed = 0;
 
             try
                 if serverChoice == 1
-                    cache2 = ftp(ftp_ip2,ftp_user2,ftp_password);
+                    cache2 = sftp(ftp_ip2,ftp_user2,"Password",ftp_password)
                 elseif serverChoice == 2
-                    cache2 = ftp(ftp_ip2,ftp_user3,ftp_password);
+                    cache2 = sftp(ftp_ip2,ftp_user3,"Password",ftp_password)
                 elseif serverChoice == 3
-                    cache2 = ftp(ftp_ip1,ftp_user1,ftp_password);
+                    cache2 = sftp(ftp_ip1,ftp_user1,"Password",ftp_password);
                 end
             catch
                 try
                     if serverChoice == 1
-                        cache2 = ftp(ftp_ip2,ftp_user2,ftp_password);
+                        cache2 = sftp(ftp_ip2,ftp_user2,"Password",ftp_password)
                     elseif serverChoice == 2
-                        cache2 = ftp(ftp_ip2,ftp_user3,ftp_password);
+                        cache2 = sftp(ftp_ip2,ftp_user3,"Password",ftp_password)
                     elseif serverChoice == 3
-                        cache2 = ftp(ftp_ip1,ftp_user1,ftp_password);
+                        cache2 = sftp(ftp_ip1,ftp_user1,"Password",ftp_password);
                     end
                 catch
                     try
-                        if serverChoice == 1
-                            cache2 = ftp(ftp_ip2,ftp_user2,ftp_password);
-                        elseif serverChoice == 2
-                            cache2 = ftp(ftp_ip2,ftp_user3,ftp_password);
-                        elseif serverChoice == 3
-                            cache2 = ftp(ftp_ip1,ftp_user1,ftp_password);
+                        connectTimes = [1,2,3,5,10,60,60*12]; % minutes
+                        connectionEstablished = 0;
+                        for ij = 1:length(connectTimes)
+                            if connectionEstablished == 0
+                                if connectTimes(ij) == 1
+                                    waitText = [' ',num2str(connectTimes(ij)),' minute.']
+                                else
+                                    waitText = [' ',num2str(connectTimes(ij)),' minutes.']
+                                end
+                                set(lblOpeningError,'Units','Pixels','Visible','on','Position',[200,130,500,40],...
+                                    'String',{'Error connecting to server.';strcat('Trying again in',waitText)},...
+                                    'Units','normalized')
+                                pause(connectTimes(ij)*60)
+                                try
+                                    if serverChoice == 1
+                                        cache2 = sftp(ftp_ip2,ftp_user2,"Password",ftp_password)
+                                    elseif serverChoice == 2
+                                        cache2 = sftp(ftp_ip2,ftp_user3,"Password",ftp_password)
+                                    elseif serverChoice == 3
+                                        cache2 = sftp(ftp_ip1,ftp_user1,"Password",ftp_password);
+                                    end
+                                    connectionEstablished = 1;
+                                    set(lblOpeningError,'Units','Pixels','Visible','off',...
+                                        'Position',[200,150,500,20],'Units','normalized')
+                                catch
+                                end
+                            end
+                        end
+                        if connectionEstablished == 0
+                            zz = abjfl; % if we made it through end of loop, cause an error to display error code below
                         end
                     catch
-                        set(lblOpeningError,'Visible','on','String',{'Error connecting to server. (code 022)';'Please try again later.'})
-                        pause
-                        while 1 ~= 2
+                        set(lblOpeningError,'Units','Pixels','Position',[200,130,500,40],'Visible','on',...
+                            'String',{'Error connecting to server. (code 027)';'Please try again later.'},...
+                            'Units','normalized')
+                        while 1==1
                             pause
                         end
                     end
@@ -4310,11 +6899,14 @@ screenshot_failed = 0;
             set(sshotFig2,'Visible','on')
             screenshot_failed = 0;
 
+            %set(viewScreenshotsIn,'Enable','off')
         catch
+            %set(viewScreenshotsIn,'Enable','on')
         end
 
         function closeSnap2(source,eventdata)
             close(sshotFig2)
+            set(viewScreenshotsIn,'Enable','on')
         end
 
         function nextSnap(source,eventdata)
@@ -4397,6 +6989,7 @@ startIn = uicontrol(UserFig,'Style','pushbutton',...
     function start_fun(src,event)
         dirRow = []; % this stores the row in directory that user chose
 
+        set(lblMapClick,'Visible','off')
         set(lblOpeningError,'Visible','off')
         set(startIn,'Visible','off')
         set(htextLocked,'Visible','off')
@@ -4426,6 +7019,7 @@ startIn = uicontrol(UserFig,'Style','pushbutton',...
         set(previewIn,'Visible','off')
         set(htextUser,'Visible','off')
         if strcmp(CoralCTformat,'mchips') || strcmp(CoralCTformat,'windows')
+            set(saveLogin, 'Visible','off')
             set(userProfileIn,'Visible','off')
             set(coreDirIn,'Visible','off')
         end
@@ -4448,6 +7042,7 @@ startIn = uicontrol(UserFig,'Style','pushbutton',...
         set(getDataIn,'Visible','off')
         set(downloadTimePreview,'Visible','off')
         set(SubmitDataIn,'Visible','off')
+        set(calibCurveIn,'Visible','off')
         set(htextLink4,'Visible','off')
 
         delete(h_map1)
@@ -4471,10 +7066,41 @@ startIn = uicontrol(UserFig,'Style','pushbutton',...
         % download from the server
         try findCoral(coralName,sectionName);
         catch
-            set(lblDownloading,'String','Error connecting to server (code 005). Please quit and try again.')
-            pause
-            while 1 ~= 2
+            try
+                connectTimes = [1,2,3,5,10,60,60*12]; % minutes
+                connectionEstablished = 0;
+                for ij = 1:length(connectTimes)
+                    if connectionEstablished == 0
+                        if connectTimes(ij) == 1
+                            waitText = [' ',num2str(connectTimes(ij)),' minute.']
+                        else
+                            waitText = [' ',num2str(connectTimes(ij)),' minutes.']
+                        end
+                        set(lblDownloading,'Units','Pixels','Visible','on','Position',[200,130,500,40],...
+                            'String',{'Error connecting to server.';strcat('Trying again in',waitText)},...
+                            'Units','normalized')
+                        pause(connectTimes(ij)*60)
+                        try
+                            findCoral(coralName,sectionName);
+                            connectionEstablished = 1;
+                            set(lblDownloading,'Units','Pixels','Visible','off',...
+                                'Position',[200,150,500,20],'Units','normalized')
+                        catch
+                        end
+                    end
+                end
+                if connectionEstablished == 0
+                    zz = abjfl; % if we made it through end of loop, cause an error to display error code below
+                end
+            catch
+                set(lblDownloading,'Units','Pixels','Position',[200,130,500,40],'Visible','on',...
+                    'String',{'Error finding data on server. (code 024)';'Please email support@coralct.org.'},...
+                    'Units','normalized')
+                %set(lblDownloading,'String','Error connecting to server (code 005). Please quit and try again.')
                 pause
+                while 1 ~= 2
+                    pause
+                end
             end
         end
 
@@ -4550,6 +7176,7 @@ dataModeLabel = uicontrol(UserFig,'Style','text',...
         set(saveDataIn, 'Visible','off')
         set(htextUser, 'Visible','off')
         if strcmp(CoralCTformat,'mchips') || strcmp(CoralCTformat,'windows')
+            set(saveLogin, 'Visible','off')
             set(userProfileIn,'Visible','off')
             set(coreDirIn,'Visible','off')
         end
@@ -4567,6 +7194,7 @@ dataModeLabel = uicontrol(UserFig,'Style','text',...
         set(htextSection,'Visible','off')
         set(subRegionIn,'Visible','off')
         set(SubmitDataIn,'Visible','off')
+        set(calibCurveIn,'Visible','off')
         set(startIn,'Visible','off')
         set(htextLocked,'Visible','off')
         try
@@ -4622,6 +7250,9 @@ areWeGoingBack = 0;
         end
         if exist(fullfile(fileOpen,strcat(name2search,'.mat')),'file')
             load(fullfile(fileOpen,strcat(name2search,'.mat')),'userBands','x_ang','contra','proj','thick')
+            try load(fullfile(fileOpen,strcat(name2search,'.mat')),'h3_width','h3_std','h3_defined')
+            catch
+            end
             areWeEditing = 1;
             if ct == 1
                 totBands = length(find(max(max(userBands)))>0);
@@ -4630,7 +7261,7 @@ areWeGoingBack = 0;
             end
             % rotate bands to match the core data
             if abs(x_ang)>0 && totBands>0 && areWeGoingBack == 0
-                hold_bands = zeros(row,col,totBands+1);
+                hold_bands = zeros(length(userBands(:,1,1)),length(userBands(1,:,1)),totBands+1);
                 hold_bands(:,:,2:end) = userBands(:,:,1:totBands);
                 hold_bands = imrotate3(hold_bands,-x_ang,[0,0,1],'nearest','crop','FillValues',0);
                 userBands(:,:,1:totBands) = hold_bands(:,:,2:end);
@@ -4756,6 +7387,7 @@ areWeGoingBack = 0;
 
         % Function for response to user's image brightness selection
         function brightness_Callback(source,eventdata)
+            functionsOff
             currentC = get(ha,'CLim'); % get current contrast
             currentRange = max(currentC)-min(currentC); % current color range
 
@@ -4776,6 +7408,7 @@ areWeGoingBack = 0;
             % textBright = sprintf('%s HU',num2str(round(-brightnessIn.Value))); % CAN BE DELETED?
             %lblBright = uicontrol(UserFig,'Style','text','String',strcat(num2str(round(-brightnessIn.Value)),' HU'),...
             %    'Position',[850,590,83,25],'Units','normalized','BackgroundColor',themeColor1,'FontSize',14,'FontName','Arial');
+            functionsOn
         end
 
         % Create slider bar for adjusting image brightness
@@ -4802,6 +7435,7 @@ areWeGoingBack = 0;
 
         % Function for response to user's image contrast selection
         function contrast_Callback(source,eventdata)
+            functionsOff
             currentC = get(ha,'CLim'); % get current contrast
             currentMean = mean(currentC); % middle of contrast range
 
@@ -4816,7 +7450,7 @@ areWeGoingBack = 0;
                 set(ha2,'CLim',contra);  % set image color range
             end
             set(lblContrast,'String',strcat(num2str(round(-contrastIn.Value)),' HU'))
-
+            functionsOn
         end
 
         % Create slider bar for adjusting image contrast
@@ -4839,6 +7473,7 @@ areWeGoingBack = 0;
 
         % Function for response to user's image contrast selection
         function thickness_Callback(source,eventdata)
+            functionsOff
             % 'thick' stores pixels into and out of screen to incorporate
             % into image display, simply update this below. The value of
             % 'hpxS' converts horizontal distance to pixels, so the user
@@ -4847,8 +7482,13 @@ areWeGoingBack = 0;
             thick = round(thickIn.Value/2/hpxS)-1; % in pixels
 
             if areWeSettingDefaults == 0
-                drawAndLabelBands
+                if smoothedBandsDrawn == 0
+                    drawAndLabelBands
+                else
+                    drawAndLabelSmoothedBands
+                end
             end
+            functionsOn
         end
 
         % Create slider bar for adjusting slice thickness
@@ -4873,6 +7513,7 @@ areWeGoingBack = 0;
 
         % Function for response to user's image position selection
         function position_Callback(source,eventdata)
+            functionsOff
             % 'slab' stores the pixel at the center of the displayed slice.
             % We just update this below (user supplies in mm, 'slab' stores
             % in pixels)
@@ -4881,18 +7522,30 @@ areWeGoingBack = 0;
 
             % update the image display
             if areWeSettingDefaults == 0
-                drawAndLabelBands
+                if smoothedBandsDrawn == 0
+                    drawAndLabelBands
+                else
+                    drawAndLabelSmoothedBands
+                end
             end
+            functionsOn
         end
 
         % Create slider bar for adjusting slice position
         if ct == 1
             if strcmp(CoralCTformat,'mchips') || strcmp(CoralCTformat,'windows')
-                positionIn = uislider(UserFig,'Position',[725,385,265,25],...
+                try positionIn = uislider(UserFig,'Position',[725,385,265,25],...
                     'Limits',[3+ceil(thick*hpxS/2) round(col*hpxS)-3-floor(thick*hpxS/2)],...
                     'Value', slabPos,'MinorTicks',[],...
                     'FontColor',themeColor1,...
                     'ValueChangedFcn', @position_Callback);
+                catch
+                    positionIn = uislider(UserFig,'Position',[725,385,265,25],...
+                    'Limits',[thick_mm/2+thick*hpxS/2, round(col*hpxS)-thick_mm/2-thick*hpxS/2],...
+                    'Value', slabPos,'MinorTicks',[],...
+                    'FontColor',themeColor1,...
+                    'ValueChangedFcn', @position_Callback);
+                end
             else
                 positionIn = uicontrol(UserFig,'Style','slider',...
                     'Position',[725,365,265,25],'Units','normalized',...
@@ -4911,6 +7564,8 @@ areWeGoingBack = 0;
 
         % Function for response to user's image rotation selection
         function rotation_Callback(source,eventdata)
+
+            functionsOff
 
             set(lblRot,'String',strcat(num2str(round(rotationIn.Value)),' °'))
 
@@ -4954,12 +7609,19 @@ areWeGoingBack = 0;
             x_ang = x_ang_new;
 
             % display intersects of existing bands into this new view
-            drawAndLabelBands
+            if smoothedBandsDrawn == 0
+                drawAndLabelBands
+            else
+                drawAndLabelSmoothedBands
+            end
 
-            haveLims = 0;
+            %haveLims = 0;
 
             % turn off 'Loading' label
             set(lblLoading,'Visible','off')
+
+            functionsOn
+
         end
 
         % Create slider bar for adjusting slice position
@@ -4992,7 +7654,11 @@ areWeGoingBack = 0;
                 case 'Max'
                     proj = 'max'; % max of pixels
             end
-            drawAndLabelBands
+            if smoothedBandsDrawn == 0
+                drawAndLabelBands
+            else
+                drawAndLabelSmoothedBands
+            end
         end
 
         if strcmp(proj,'mean')
@@ -5065,9 +7731,17 @@ areWeGoingBack = 0;
                     set(lblDeleted,'Visible','off')
 
                     if ct
-                        drawAndLabelBands
+                        if smoothedBandsDrawn == 0
+                            drawAndLabelBands
+                        else
+                            drawAndLabelSmoothedBands
+                        end
                     else
-                        drawAndLabelBandsXray
+                        if smoothedBandsDrawn == 0
+                            drawAndLabelBandsXray
+                        else
+                            drawAndLabelSmoothedBandsXray
+                        end
                     end
                     enableAll
                 end
@@ -5098,7 +7772,11 @@ areWeGoingBack = 0;
             userBands(userBands==0) = NaN;
             userBands = layers-userBands;
             userBands(isnan(userBands)) = 0;
-            drawAndLabelBands
+            if smoothedBandsDrawn == 0
+                drawAndLabelBands
+            else
+                drawAndLabelSmoothedBands
+            end
         end
 
         twistBandsIn = uicontrol(UserFig,'Style','pushbutton','String',{'rotate bands'},'Visible','off',...
@@ -5106,7 +7784,11 @@ areWeGoingBack = 0;
 
         function rotateBands_Callback(source,eventdata)
             userBands = permute(userBands,[2,1,3]);
-            drawAndLabelBands
+            if smoothedBandsDrawn == 0
+                drawAndLabelBands
+            else
+                drawAndLabelSmoothedBands
+            end
         end
 
         swapBandsIn = uicontrol(UserFig,'Style','pushbutton','String',{'swap order'},'Visible','off',...
@@ -5114,7 +7796,11 @@ areWeGoingBack = 0;
 
         function swapBands_Callback(source,eventdata)
             userBands = flipdim(userBands,3);
-            drawAndLabelBands
+            if smoothedBandsDrawn == 0
+                drawAndLabelBands
+            else
+                drawAndLabelSmoothedBands
+            end
         end
 
         shiftBandsIn = uicontrol(UserFig,'Style','edit','Visible','off',...
@@ -5133,7 +7819,11 @@ areWeGoingBack = 0;
 
             userBands(userBands>0) = userBands(userBands>0)+shift_dif;
 
-            drawAndLabelBands
+            if smoothedBandsDrawn == 0
+                drawAndLabelBands
+            else
+                drawAndLabelSmoothedBands
+            end
         end
 
         if previous_bands_fixing_mode == 1
@@ -5227,9 +7917,17 @@ areWeGoingBack = 0;
 
                     % update image display
                     if ct
-                        drawAndLabelBands
+                        if smoothedBandsDrawn == 0
+                            drawAndLabelBands
+                        else
+                            drawAndLabelSmoothedBands
+                        end
                     else
-                        drawAndLabelBandsXray
+                        if smoothedBandsDrawn == 0
+                            drawAndLabelBandsXray
+                        else
+                            drawAndLabelSmoothedBandsXray
+                        end
                     end
 
                     pause(3)
@@ -5267,9 +7965,17 @@ areWeGoingBack = 0;
 
                     % update image display
                     if ct
-                        drawAndLabelBands
+                        if smoothedBandsDrawn == 0
+                            drawAndLabelBands
+                        else
+                            drawAndLabelSmoothedBands
+                        end
                     else
-                        drawAndLabelBandsXray
+                        if smoothedBandsDrawn == 0
+                            drawAndLabelBandsXray
+                        else
+                            drawAndLabelSmoothedBandsXray
+                        end
                     end
 
                     pause(3)
@@ -5337,9 +8043,17 @@ areWeGoingBack = 0;
 
             % update displayed image
             if ct
-                drawAndLabelBands
+                if smoothedBandsDrawn == 0
+                    drawAndLabelBands
+                else
+                    drawAndLabelSmoothedBands
+                end
             else
-                drawAndLabelBandsXray
+                if smoothedBandsDrawn == 0
+                    drawAndLabelBandsXray
+                else
+                    drawAndLabelSmoothedBandsXray
+                end
             end
             enableAll
         end
@@ -5355,6 +8069,7 @@ areWeGoingBack = 0;
 
         % Function to reset defaults
         function defaults_Callback(source,eventdata)
+            functionsOff
             areWeSettingDefaults = 1;
             set(lblLoading,'Visible','on')
             brightnessIn.Value = -1300;
@@ -5371,32 +8086,33 @@ areWeGoingBack = 0;
             end
             set(lblLoading,'Visible','off')
             areWeSettingDefaults = 0;
+            functionsOn
         end
 
         viewNotesIn = uicontrol(UserFig,'Style','pushbutton',...
             'String',{'View core notes'},...
-            'Position',[500,15,160,30],'Units','normalized',...
-            'BackgroundColor',[255, 189, 68]/256,'FontSize',12,...
+            'Position',[840,15,120,24],'Units','normalized',...
+            'BackgroundColor',[255, 189, 68]/256,'FontSize',11,...
             'FontName','Arial','Callback',@viewNotes,...
             'Visible','on');
 
         hideNotesIn = uicontrol(UserFig,'Style','pushbutton',...
             'String',{'Hide notes'},...
-            'Position',[500,15,160,30],'Units','normalized',...
-            'BackgroundColor',[255, 189, 68]/256,'FontSize',12,...
+            'Position',[840,15,120,24],'Units','normalized',...
+            'BackgroundColor',[255, 189, 68]/256,'FontSize',11,...
             'FontName','Arial','Callback',@hideNotes,...
             'Visible','off');
 
         editNotesIn = uicontrol(UserFig,'Style','pushbutton',...
             'String',{'Edit notes'},...
-            'Position',[740,350,100,25],'Units','normalized',...
+            'Position',[840,350,100,25],'Units','normalized',...
             'BackgroundColor',[255, 189, 68]/256,'FontSize',12,...
             'FontName','Arial','Callback',@editNotes,...
             'Visible','off');
 
         editNotesDoneIn = uicontrol(UserFig,'Style','pushbutton',...
             'String',{'Done'},...
-            'Position',[740,350,100,25],'Units','normalized',...
+            'Position',[840,350,100,25],'Units','normalized',...
             'BackgroundColor',[255, 189, 68]/256,'FontSize',12,...
             'FontName','Arial','Callback',@editNotesDone,...
             'Visible','off');
@@ -5495,7 +8211,7 @@ areWeGoingBack = 0;
                 try mput(cache1,fullfile(selpath,'my_corals','coral_directory_master.txt'));
                 catch
                     try
-                        cache1 = ftp(ftp_ip1,ftp_user1,ftp_password);
+                        cache1 = sftp(ftp_ip1,ftp_user1,"Password",ftp_password);
                         cd(cache1,'CoralCache')
                         mput(cache1,fullfile(selpath,'my_corals','coral_directory_master.txt'));
                     catch
@@ -5687,40 +8403,106 @@ areWeGoingBack = 0;
             'String',{'Save and exit'},...
             'Position',[660,160,200,40],'Units','normalized','BackgroundColor',[0.96,0.51,0.58],'FontSize',14,'FontName','Arial','Callback',@done_Callback);
 
+        % temporarily turn off default mode buttons
+        function functionsOff
+            set(clickIn,'Enable','off')
+            set(jumpIn,'Enable','off')
+            set(eraseIn,'Enable','off')
+            set(deleteIn,'Enable','off')
+            set(insertIn,'Enable','off')
+            set(defaultIn,'Enable','off')
+            set(doneIn,'Enable','off')
+            set(processIn,'Enable','off')
+            set(dispSmoothBandsIn,'Enable','off')
+            set(dispInterpClicksIn,'Enable','off')
+            set(filterEditIn,'Enable','off')
+            set(autoEnableIn,'Enable','off')
+            set(viewNotesIn,'Enable','off')
+            set(saveScreenshotIn,'Enable','off')
+            set(viewScreenshotsIn,'Enable','off')
+        end
+
+        function functionsOn
+            set(clickIn,'Enable','on')
+            set(jumpIn,'Enable','on')
+            set(eraseIn,'Enable','on')
+            set(deleteIn,'Enable','on')
+            set(insertIn,'Enable','on')
+            set(defaultIn,'Enable','on')
+            set(doneIn,'Enable','on')
+            set(processIn,'Enable','on')
+            set(dispSmoothBandsIn,'Enable','on')
+            set(dispInterpClicksIn,'Enable','on')
+            set(filterEditIn,'Enable','on')
+            set(autoEnableIn,'Enable','on')
+            set(viewNotesIn,'Enable','on')
+            set(saveScreenshotIn,'Enable','on')
+            set(viewScreenshotsIn,'Enable','on')
+        end
+
         % Function to save user inputs and close
         function done_Callback(source,eventdata)
 
+            functionsOff
+            pause(0.01)
+
             if view_only == 0
+                
                 try
                     if serverChoice == 1
-                        cache2 = ftp(ftp_ip2,ftp_user2,ftp_password);
+                        cache2 = sftp(ftp_ip2,ftp_user2,"Password",ftp_password)
                     elseif serverChoice == 2
-                        cache2 = ftp(ftp_ip2,ftp_user3,ftp_password);
+                        cache2 = sftp(ftp_ip2,ftp_user3,"Password",ftp_password)
                     elseif serverChoice == 3
-                        cache2 = ftp(ftp_ip1,ftp_user1,ftp_password);
+                        cache2 = sftp(ftp_ip1,ftp_user1,"Password",ftp_password);
                     end
                 catch
                     try
                         if serverChoice == 1
-                            cache2 = ftp(ftp_ip2,ftp_user2,ftp_password);
+                            cache2 = sftp(ftp_ip2,ftp_user2,"Password",ftp_password)
                         elseif serverChoice == 2
-                            cache2 = ftp(ftp_ip2,ftp_user3,ftp_password);
+                            cache2 = sftp(ftp_ip2,ftp_user3,"Password",ftp_password)
                         elseif serverChoice == 3
-                            cache2 = ftp(ftp_ip1,ftp_user1,ftp_password);
+                            cache2 = sftp(ftp_ip1,ftp_user1,"Password",ftp_password);
                         end
                     catch
                         try
-                            if serverChoice == 1
-                                cache2 = ftp(ftp_ip2,ftp_user2,ftp_password);
-                            elseif serverChoice == 2
-                                cache2 = ftp(ftp_ip2,ftp_user3,ftp_password);
-                            elseif serverChoice == 3
-                                cache2 = ftp(ftp_ip1,ftp_user1,ftp_password);
+                            connectTimes = [1,2,3,5,10,60,60*12]; % minutes
+                            connectionEstablished = 0;
+                            for ij = 1:length(connectTimes)
+                                if connectionEstablished == 0
+                                    if connectTimes(ij) == 1
+                                        waitText = [' ',num2str(connectTimes(ij)),' minute.']
+                                    else
+                                        waitText = [' ',num2str(connectTimes(ij)),' minutes.']
+                                    end
+                                    set(lblOpeningError,'Units','Pixels','Visible','on','Position',[200,130,500,40],...
+                                        'String',{'Error connecting to server.';strcat('Trying again in',waitText)},...
+                                        'Units','normalized')
+                                    pause(connectTimes(ij)*60)
+                                    try
+                                        if serverChoice == 1
+                                            cache2 = sftp(ftp_ip2,ftp_user2,"Password",ftp_password)
+                                        elseif serverChoice == 2
+                                            cache2 = sftp(ftp_ip2,ftp_user3,"Password",ftp_password)
+                                        elseif serverChoice == 3
+                                            cache2 = sftp(ftp_ip1,ftp_user1,"Password",ftp_password);
+                                        end
+                                        connectionEstablished = 1;
+                                        set(lblOpeningError,'Units','Pixels','Visible','off',...
+                                            'Position',[200,150,500,20],'Units','normalized')
+                                    catch
+                                    end
+                                end
+                            end
+                            if connectionEstablished == 0
+                                zz = abjfl; % if we made it through end of loop, cause an error to display error code below
                             end
                         catch
-                            set(lblOpeningError,'Visible','on','String',{'Error connecting to server. (code 022)';'Please try again later.'})
-                            pause
-                            while 1 ~= 2
+                            set(lblOpeningError,'Units','Pixels','Position',[200,130,500,40],'Visible','on',...
+                                'String',{'Error connecting to server. (code 028)';'Please try again later.'},...
+                                'Units','normalized')
+                            while 1==1
                                 pause
                             end
                         end
@@ -5729,10 +8511,10 @@ areWeGoingBack = 0;
 
                 % Before saving, check if we are working on a core that has
                 % multiple sections.
-                % and save userBands to the FTP server
+                % and save userBands to the sftp server
                 if strcmp('',sectionName) % no sections
                     % set directory to this coral's folder on server
-                    save(fullfile(fileOpen,name2search), 'userBands','x_ang','CoralCTversion','contra','proj','thick');
+                    save(fullfile(fileOpen,name2search), 'userBands','x_ang','CoralCTversion','contra','proj','thick','h3_width','h3_std','h3_defined');
                     server_path = strcat(h_drive,coralDir.textdata{dirRow,3},'/',...
                         coralDir.textdata{dirRow,4},'/',thisCoralName);
                     if serverChoice == 1 || serverChoice == 3
@@ -5743,7 +8525,7 @@ areWeGoingBack = 0;
 
                 else % yes, sections
                     % set directory to this sections's folder on server
-                    save(fullfile(fileOpen,name2search), 'userBands','x_ang','CoralCTversion','contra','proj','thick');
+                    save(fullfile(fileOpen,name2search), 'userBands','x_ang','CoralCTversion','contra','proj','thick','h3_width','h3_std','h3_defined');
                     server_path = strcat(h_drive,'/',coralDir.textdata{dirRow,3},'/',...
                         coralDir.textdata{dirRow,4},'/',thisCoralName,'/',thisSectionName);
                     if serverChoice == 1 || serverChoice == 3
@@ -5763,6 +8545,8 @@ areWeGoingBack = 0;
             mainMenu
             moveOn = 1;
 
+            functionsOn
+
         end
 
 
@@ -5772,6 +8556,19 @@ areWeGoingBack = 0;
         processIn = uicontrol(UserFig,'Style','pushbutton',...
             'String',{'Process growth'},...
             'Position',[660,110,200,40],'Units','normalized','BackgroundColor',[0.61,0.86,0.57],'FontSize',14,'FontName','Arial','Callback',@process_Callback);
+
+        % ability to extract snapshot for AI testing
+        if strcmp(UserSetIn.String,'TestUser')
+            set(processIn,'String',{'Save 2D for AI'},'Callback',@extract2D)
+        end
+
+        function extract2D(source,eventdata)
+            image_data = corePlot.CData;
+            observer_lines_x = bandsPlot.XData/hpxS;
+            observer_lines_y = bandsPlot.YData/pxS;
+            save(strcat(coralName,'_for_AI'),'image_data','observer_lines_x','observer_lines_y')
+        end
+
 
         % Create option for identifying the next band
         % create pushbutton for this
@@ -5790,14 +8587,14 @@ areWeGoingBack = 0;
         % Create option for being done with the band that's in progress
         % create pushbutton for this
         doneBandIn = uicontrol(UserFig,'Style','pushbutton',...
-            'String',{'Done with band'},...
+            'String',{'Done with band'},'Visible','off',...
             'Position',[350,730,200,60],'Units','normalized','BackgroundColor',[0.61,0.86,0.57],'FontSize',14,'FontName','Arial','Callback',@doneBand_Callback);
 
         % Function to stop identifying this band
         function doneBand_Callback(source,eventdata)
 
             % save the userBand data locally
-            save(fullfile(fileOpen,name2search), 'userBands','x_ang','CoralCTversion','contra','proj','thick');
+            save(fullfile(fileOpen,name2search), 'userBands','x_ang','CoralCTversion','contra','proj','thick','h3_width','h3_std','h3_defined');
 
             % this toggles within the click band function to be done with
             % clickings:
@@ -5810,7 +8607,7 @@ areWeGoingBack = 0;
 
         % create pushbutton for this
         redoBandIn = uicontrol(UserFig,'Style','pushbutton',...
-            'String',{'Redo this band'},...
+            'String',{'Redo this band'},'Visible','off',...
             'Position',[600,730,200,60],'Units','normalized','BackgroundColor',[0.96,0.51,0.58],'FontSize',14,'FontName','Arial','Callback',@redoBand_Callback);
 
         UndoLastClickIn = uicontrol(UserFig,'Style','pushbutton',...
@@ -5898,7 +8695,7 @@ areWeGoingBack = 0;
         function acceptAndDoneProposed_Callback(source,eventdata)
             acceptProposed = 1;
             continueAuto = 0;
-            save(fullfile(fileOpen,name2search), 'userBands','x_ang','CoralCTversion','contra','proj','thick');
+            save(fullfile(fileOpen,name2search), 'userBands','x_ang','CoralCTversion','contra','proj','thick','h3_width','h3_std','h3_defined');
             areWeDone = 1;
         end
 
@@ -5952,51 +8749,189 @@ areWeGoingBack = 0;
         scalebar2 = [];
         scaleText = [];
         scale_mm = 10;
+        %set(UserFig,'WindowscrollWheelFcn', @zoomPostCallback);
+        set(UserFig,'WindowButtonUpFcn', @doNothing);
+        % button for checking latest version
+
+        ha.Toolbar.Visible = 'off';
+
+        function doNothing(obj,evd)
+        end
+
+        img_hand = imread(fullfile('loading_movies','hand.jpg'));
+        img_zoomin = imread(fullfile('loading_movies','zoomin.png'));
+        img_zoomout = imread(fullfile('loading_movies','zoomout.png'));
+
+        img_hand_sized = imresize(img_hand,[20,20]);
+        img_zoomin_sized = imresize(img_zoomin,[20,20]);
+        img_zoomout_sized = imresize(img_zoomout,[20,20]);
+        panIn = uibutton(UserFig,...
+            'Position',[460,610,20,20],...
+            'BackgroundColor',themeColor1,'FontSize',10,...
+            'FontName','Arial','ButtonPushedFcn',@panfun,...
+            'Visible','on','Icon',img_hand_sized,'Text','');
+
+        panOut = uibutton(UserFig,...
+            'Position',[460,610,20,20],...
+            'BackgroundColor',themeColor1-0.3,'FontSize',10,...
+            'FontName','Arial','ButtonPushedFcn',@stoppanfun,...
+            'Visible','off','Icon',img_hand_sized,'Text','');
+
+        %panon = 0;
+        function panfun(obj,evd)
+            set(panIn,'Visible','off')
+            set(panOut,'Visible','on')
+            set(zoomInIn,'Visible','on')
+            set(zoomInOut,'Visible','off')
+            zoom(ha,'off')
+            pan(ha,'on')
+            %panon = 1;
+            %zoomon = 0;
+        end
+        function stoppanfun(obj,evd)
+            set(panIn,'Visible','on')
+            set(panOut,'Visible','off')
+            pan(ha,'off')
+            %panon = 0;
+        end
+
+        zoomInIn = uibutton(UserFig,...
+            'Position',[490,610,20,20],...
+            'BackgroundColor',themeColor1,'FontSize',10,...
+            'FontName','Arial','ButtonPushedFcn',@zoominfun,...
+            'Visible','on','Icon',img_zoomin_sized,'Text','');
+
+        zoomInOut = uibutton(UserFig,...
+            'Position',[490,610,20,20],...
+            'BackgroundColor',themeColor1-0.3,'FontSize',10,...
+            'FontName','Arial','ButtonPushedFcn',@stopzoominfun,...
+            'Visible','off','Icon',img_zoomin_sized,'Text','');
+
+        %zoomon = 0;
+        function zoominfun(obj,evd)
+            set(zoomInIn,'Visible','off')
+            set(zoomInOut,'Visible','on')
+            set(panIn,'Visible','on')
+            set(panOut,'Visible','off')
+            pan(ha,'off')
+            zoom(ha,'on')
+            %zoomon = 1;
+            %panon = 0;
+        end
+        function stopzoominfun(obj,evd)
+            set(zoomInIn,'Visible','on')
+            set(zoomInOut,'Visible','off')
+            zoom(ha,'off')
+            %zoomon = 0;
+        end
+
+        zoomOutIn = uibutton(UserFig,...
+            'Position',[520,610,20,20],...
+            'BackgroundColor',themeColor1,'FontSize',10,...
+            'FontName','Arial','ButtonPushedFcn',@zoomoutfun,...
+            'Visible','on','Icon',img_zoomout_sized,'Text','');
+
+        function zoomoutfun(obj,evd)
+            set(panIn,'Visible','on')
+            set(panOut,'Visible','off')
+            set(zoomInIn,'Visible','on')
+            set(zoomInOut,'Visible','off')
+            zoom(ha,'off')
+            pan(ha,'off')
+            zoom(ha,'out')
+        end
+
         function zoomPostCallback(obj,evd)
+            set(lblLoading,'Visible','on')
+            %iptSetPointerBehavior(ha, @(UserFig, currentPoint)set(UserFig, 'Pointer', 'custom', 'PointerShapeCData', [NaN,NaN]))
+            pause(0.01)
+            set(panIn,'Enable','off')
+            set(panOut,'Enable','off')
+            set(zoomInIn,'Enable','off')
+            set(zoomInOut,'Enable','off')
+            set(zoomOutIn,'Enable','off')
+
+            functionsOff
+
             ys = get(ha,'YLim');
             xs = get(ha,'XLim');
             delete(scalebar)
             delete(scalebar1)
             delete(scalebar2)
             delete(scaleText)
-            if ct ==  1
-                scalebar = patch(ha,xs(1)+[range(xs)*0.05, range(xs)*0.05, range(xs)*0.05+scale_mm,...
-                    range(xs)*0.05+scale_mm, range(xs)*0.05],...
-                    ys(1)+[range(ys)*0.03, range(ys)*0.035, range(ys)*0.035,...
-                    range(ys)*0.03, range(ys)*0.03],themeColor1,'EdgeColor','none');
-                scalebar1 = patch(ha,xs(1)+[range(xs)*0.05, range(xs)*0.05, range(xs)*0.055,...
-                    range(xs)*0.055, range(xs)*0.05],...
-                    ys(1)+[range(ys)*0.02, range(ys)*0.045, range(ys)*0.045,...
-                    range(ys)*0.02, range(ys)*0.02],themeColor1,'EdgeColor','none');
-                scalebar2 = patch(ha,xs(1)+[range(xs)*0.045+scale_mm, range(xs)*0.045+scale_mm, range(xs)*0.05+scale_mm,...
-                    range(xs)*0.05+scale_mm, range(xs)*0.045+scale_mm],...
-                    ys(1)+[range(ys)*0.02, range(ys)*0.045, range(ys)*0.045,...
-                    range(ys)*0.02, range(ys)*0.02],themeColor1,'EdgeColor','none');
-                scaleText = text(ha,xs(1)+range(xs)*0.06+scale_mm,...
-                    ys(1)+range(ys)*0.03,'10 mm','FontSize',12,'FontWeight','bold',...
-                    'Color',themeColor1,'VerticalAlignment','bottom');
+            % if panon == 1
+            %     hp('Enable','off')
+            % end
+            % if zoomon == 1
+            %     set(hz,'Enable','off')
+            % end
+            pause(0.01)
+            %dispSlab
+            if ct == 1
+                if smoothedBandsDrawn == 0
+                    drawAndLabelBands
+                else
+                    drawAndLabelSmoothedBands
+                end
             else
-                scalebar = patch(ha,xs(1)+[range(xs)*0.05, range(xs)*0.05, range(xs)*0.05+scale_mm,...
-                    range(xs)*0.05+scale_mm, range(xs)*0.05],...
-                    ys(2)-[range(ys)*0.03, range(ys)*0.035, range(ys)*0.035,...
-                    range(ys)*0.03, range(ys)*0.03],themeColor1,'EdgeColor','none');
-                scalebar1 = patch(ha,xs(1)+[range(xs)*0.05, range(xs)*0.05, range(xs)*0.055,...
-                    range(xs)*0.055, range(xs)*0.05],...
-                    ys(2)-[range(ys)*0.02, range(ys)*0.045, range(ys)*0.045,...
-                    range(ys)*0.02, range(ys)*0.02],themeColor1,'EdgeColor','none');
-                scalebar2 = patch(ha,xs(1)+[range(xs)*0.045+scale_mm, range(xs)*0.045+scale_mm, range(xs)*0.05+scale_mm,...
-                    range(xs)*0.05+scale_mm, range(xs)*0.045+scale_mm],...
-                    ys(2)-[range(ys)*0.02, range(ys)*0.045, range(ys)*0.045,...
-                    range(ys)*0.02, range(ys)*0.02],themeColor1,'EdgeColor','none');
-                scaleText = text(ha,xs(1)+range(xs)*0.06+scale_mm,...
-                    ys(2)-range(ys)*0.03,'10 mm','FontSize',12,'FontWeight','bold',...
-                    'Color',themeColor1,'VerticalAlignment','bottom');
+                if smoothedBandsDrawn == 0
+                    drawAndLabelBandsXray
+                else
+                    drawAndLabelSmoothedBandsXray
+                end
             end
+            % if ct ==  1
+            %     scalebar = patch(ha,xs(1)+[range(xs)*0.05, range(xs)*0.05, range(xs)*0.05+scale_mm,...
+            %         range(xs)*0.05+scale_mm, range(xs)*0.05],...
+            %         ys(1)+[range(ys)*0.03, range(ys)*0.035, range(ys)*0.035,...
+            %         range(ys)*0.03, range(ys)*0.03],themeColor1,'EdgeColor','none');
+            %     scalebar1 = patch(ha,xs(1)+[range(xs)*0.05, range(xs)*0.05, range(xs)*0.055,...
+            %         range(xs)*0.055, range(xs)*0.05],...
+            %         ys(1)+[range(ys)*0.02, range(ys)*0.045, range(ys)*0.045,...
+            %         range(ys)*0.02, range(ys)*0.02],themeColor1,'EdgeColor','none');
+            %     scalebar2 = patch(ha,xs(1)+[range(xs)*0.045+scale_mm, range(xs)*0.045+scale_mm, range(xs)*0.05+scale_mm,...
+            %         range(xs)*0.05+scale_mm, range(xs)*0.045+scale_mm],...
+            %         ys(1)+[range(ys)*0.02, range(ys)*0.045, range(ys)*0.045,...
+            %         range(ys)*0.02, range(ys)*0.02],themeColor1,'EdgeColor','none');
+            %     scaleText = text(ha,xs(1)+range(xs)*0.06+scale_mm,...
+            %         ys(1)+range(ys)*0.03,'10 mm','FontSize',12,'FontWeight','bold',...
+            %         'Color',themeColor1,'VerticalAlignment','bottom');
+            % else
+            %     scalebar = patch(ha,xs(1)+[range(xs)*0.05, range(xs)*0.05, range(xs)*0.05+scale_mm,...
+            %         range(xs)*0.05+scale_mm, range(xs)*0.05],...
+            %         ys(2)-[range(ys)*0.03, range(ys)*0.035, range(ys)*0.035,...
+            %         range(ys)*0.03, range(ys)*0.03],themeColor1,'EdgeColor','none');
+            %     scalebar1 = patch(ha,xs(1)+[range(xs)*0.05, range(xs)*0.05, range(xs)*0.055,...
+            %         range(xs)*0.055, range(xs)*0.05],...
+            %         ys(2)-[range(ys)*0.02, range(ys)*0.045, range(ys)*0.045,...
+            %         range(ys)*0.02, range(ys)*0.02],themeColor1,'EdgeColor','none');
+            %     scalebar2 = patch(ha,xs(1)+[range(xs)*0.045+scale_mm, range(xs)*0.045+scale_mm, range(xs)*0.05+scale_mm,...
+            %         range(xs)*0.05+scale_mm, range(xs)*0.045+scale_mm],...
+            %         ys(2)-[range(ys)*0.02, range(ys)*0.045, range(ys)*0.045,...
+            %         range(ys)*0.02, range(ys)*0.02],themeColor1,'EdgeColor','none');
+            %     scaleText = text(ha,xs(1)+range(xs)*0.06+scale_mm,...
+            %         ys(2)-range(ys)*0.03,'10 mm','FontSize',12,'FontWeight','bold',...
+            %         'Color',themeColor1,'VerticalAlignment','bottom');
+            % end
+            set(panIn,'Enable','on')
+            set(panOut,'Enable','on')
+            set(zoomInIn,'Enable','on')
+            set(zoomInOut,'Enable','on')
+            set(zoomOutIn,'Enable','on')
+            set(lblLoading,'Visible','off')
+            % if zoomon == 1
+            %     zoom(ha,'on')
+            % end
+            % if panon == 1
+            %     pan(ha,'on')
+            % end
+            functionsOn
+            pause(0.01)
         end
 
         % accept this but switch to manual
         drawDeleteBox1In = uicontrol(UserFig,'Style','pushbutton',...
-            'String',{'Draw a box to delete';'clicks on this band'},...
+            'String',{'Draw a box to delete';'clicks on this band'},'Visible','off',...
             'Position',[850   730   200    60],'Units','normalized','BackgroundColor',[255, 189, 68]/256,'FontSize',12,'FontName','Arial','Callback',@drawDeleteBox1);
 
         lblExplainBox = uicontrol(UserFig,'Style','text','String',{'This only applies to areas outside';'of the current slab (red box)'},'BackgroundColor','none',...
@@ -6013,7 +8948,7 @@ areWeGoingBack = 0;
         end
 
         drawDeleteBox2In = uicontrol(UserFig,'Style','pushbutton',...
-            'String',{'Draw a box to delete';'clicks on this band';'in axial view below'},...
+            'String',{'Draw a box to delete';'clicks on this band';'in axial view below'},'Visible','off',...
             'Position',[850   530   200    70],'Units','normalized','BackgroundColor',[255, 189, 68]/256,'FontSize',12,'FontName','Arial','Callback',@drawDeleteBox2);
 
         need2delete2 = 0;
@@ -6036,9 +8971,12 @@ areWeGoingBack = 0;
 
         saveScreenshotIn = uicontrol(UserFig,'Style','pushbutton',...
             'String',{'Snap screenshot'},'Visible','on',...
-            'Position',[840,15,125,24],'Units','normalized','BackgroundColor',[1 0.65 0],'FontSize',11,'FontName','Arial','Callback',@screenShot);
+            'Position',[980,49,125,24],'Units','normalized','BackgroundColor',[1 0.65 0],'FontSize',11,'FontName','Arial','Callback',@screenShot);
 
         function screenShot(source,eventdata)
+            functionsOff
+            set(saveScreenshotIn,'Enable','off')
+            drawnow
             sshotFig = uifigure('Visible','on','Position',[50,100,800,800],'Color','k');
             sha1 = uiaxes(sshotFig,'units','normalized','Position',[0.0300    0.1100    0.7    0.8150]);
             set(sha1,'Color','k','xcolor','k','ycolor','k','XTick',[],'YTick',[])
@@ -6052,7 +8990,25 @@ areWeGoingBack = 0;
             t = datetime('now') ;
             t.Format = 'dd-MMM-uuuu HH:mm a';
             text(sha1,0.01,0.01,strcat([saveFileName,': ',char(t)]),'Color','y','units','normalized','FontSize',12)
-            title(sha1,coralName,'Color',themeColor1)
+            if strcmp(sectionName,'')
+                dispTitleName = coralName;
+            else
+                dispTitleName = [coralName,' ',sectionName];
+            end
+            dispTitleName0 = double(dispTitleName);
+            idxUnderScore = find(dispTitleName0==95);
+            if length(idxUnderScore)
+                dispTitleName = [];
+                idxUnderScore = [0, idxUnderScore];
+                for jjj = 2:length(idxUnderScore)
+                    dispTitleName = [dispTitleName, dispTitleName0(idxUnderScore(jjj-1)+1:idxUnderScore(jjj)-1),92, 95];
+                end
+                dispTitleName = char([dispTitleName, dispTitleName0(idxUnderScore(jjj)+1:end)]);
+            else
+                %dispTitleName = coralName;
+            end
+            
+            title(sha1,dispTitleName,'Color',themeColor1)
 
             if ct == 1
                 sha2 = uiaxes(sshotFig,'units','normalized','Position',[0.7500    0.1100    0.2    0.2]);
@@ -6073,6 +9029,7 @@ areWeGoingBack = 0;
 
             function closeSnap(source,eventdata)
                 close(sshotFig)
+                set(saveScreenshotIn,'Enable','on')
             end
 
             drawAnnotationIn = uicontrol(sshotFig,'Style','pushbutton',...
@@ -6191,34 +9148,59 @@ areWeGoingBack = 0;
 
                 try
                     if serverChoice == 1
-                        cache2 = ftp(ftp_ip2,ftp_user2,ftp_password);
+                        cache2 = sftp(ftp_ip2,ftp_user2,"Password",ftp_password)
                     elseif serverChoice == 2
-                        cache2 = ftp(ftp_ip2,ftp_user3,ftp_password);
+                        cache2 = sftp(ftp_ip2,ftp_user3,"Password",ftp_password)
                     elseif serverChoice == 3
-                        cache2 = ftp(ftp_ip1,ftp_user1,ftp_password);
+                        cache2 = sftp(ftp_ip1,ftp_user1,"Password",ftp_password);
                     end
                 catch
                     try
                         if serverChoice == 1
-                            cache2 = ftp(ftp_ip2,ftp_user2,ftp_password);
+                            cache2 = sftp(ftp_ip2,ftp_user2,"Password",ftp_password)
                         elseif serverChoice == 2
-                            cache2 = ftp(ftp_ip2,ftp_user3,ftp_password);
+                            cache2 = sftp(ftp_ip2,ftp_user3,"Password",ftp_password)
                         elseif serverChoice == 3
-                            cache2 = ftp(ftp_ip1,ftp_user1,ftp_password);
+                            cache2 = sftp(ftp_ip1,ftp_user1,"Password",ftp_password);
                         end
                     catch
                         try
-                            if serverChoice == 1
-                                cache2 = ftp(ftp_ip2,ftp_user2,ftp_password);
-                            elseif serverChoice == 2
-                                cache2 = ftp(ftp_ip2,ftp_user3,ftp_password);
-                            elseif serverChoice == 3
-                                cache2 = ftp(ftp_ip1,ftp_user1,ftp_password);
+                            connectTimes = [1,2,3,5,10,60,60*12]; % minutes
+                            connectionEstablished = 0;
+                            for ij = 1:length(connectTimes)
+                                if connectionEstablished == 0
+                                    if connectTimes(ij) == 1
+                                        waitText = [' ',num2str(connectTimes(ij)),' minute.']
+                                    else
+                                        waitText = [' ',num2str(connectTimes(ij)),' minutes.']
+                                    end
+                                    set(lblOpeningError,'Units','Pixels','Visible','on','Position',[200,130,500,40],...
+                                        'String',{'Error connecting to server.';strcat('Trying again in',waitText)},...
+                                        'Units','normalized')
+                                    pause(connectTimes(ij)*60)
+                                    try
+                                        if serverChoice == 1
+                                            cache2 = sftp(ftp_ip2,ftp_user2,"Password",ftp_password)
+                                        elseif serverChoice == 2
+                                            cache2 = sftp(ftp_ip2,ftp_user3,"Password",ftp_password)
+                                        elseif serverChoice == 3
+                                            cache2 = sftp(ftp_ip1,ftp_user1,"Password",ftp_password);
+                                        end
+                                        connectionEstablished = 1;
+                                        set(lblOpeningError,'Units','Pixels','Visible','off',...
+                                            'Position',[200,150,500,20],'Units','normalized')
+                                    catch
+                                    end
+                                end
+                            end
+                            if connectionEstablished == 0
+                                zz = abjfl; % if we made it through end of loop, cause an error to display error code below
                             end
                         catch
-                            set(lblOpeningError,'Visible','on','String',{'Error connecting to server. (code 022)';'Please try again later.'})
-                            pause
-                            while 1 ~= 2
+                            set(lblOpeningError,'Units','Pixels','Position',[200,130,500,40],'Visible','on',...
+                                'String',{'Error connecting to server. (code 029)';'Please try again later.'},...
+                                'Units','normalized')
+                            while 1==1
                                 pause
                             end
                         end
@@ -6258,6 +9240,7 @@ areWeGoingBack = 0;
                 mput(cache2,fullfile(refPath,strcat('Screenshot_',img_text,'.png')));
 
             end
+            functionsOn
         end
 
         dispSmoothBandsIn = uicontrol(UserFig,'Style','pushbutton',...
@@ -6271,26 +9254,276 @@ areWeGoingBack = 0;
         smoothedBandsDrawn = 0;
 
         function dispSmoothBands(source,eventdata)
+            functionsOff
             set(dispInterpClicksIn,'Visible','on')
             set(dispSmoothBandsIn,'Visible','off')
+            smoothedBandsDrawn = 1;
             if ct == 1
                 drawAndLabelSmoothedBands
             else
                 drawAndLabelSmoothedBandsXray
             end
-            smoothedBandsDrawn = 1;
+            functionsOn
         end
 
         function dispIntClicks(source,eventdata)
+            functionsOff
             set(dispInterpClicksIn,'Visible','off')
             set(dispSmoothBandsIn,'Visible','on')
+            smoothedBandsDrawn = 0;
             if ct == 1
                 drawAndLabelBands
             else
                 drawAndLabelBandsXray
             end
-            smoothedBandsDrawn = 0;
+            functionsOn
         end
+
+        function updateBandLines
+
+            delete(bandsPlot)
+
+            if ct == 1
+                if smoothedBandsDrawn == 0
+
+                    if max(max(max(userBands)))>0
+                        totBands3 = find(max(max(userBands)));
+                        LDBdata = zeros(row,col,max(totBands3));
+                        for i4 = totBands3'
+                            if max(max(userBands(:,:,i4)))>0
+                                [r,c] = find(userBands(:,:,i4));
+                                if ~isempty(r)
+                                    v = zeros(1,length(r));
+                                    for j2 = 1:length(r)
+                                        v(j2) = userBands(r(j2),c(j2),i4);
+                                    end
+                                    warning('off','all');
+                                    if length(round(griddata(r,c,v,rowMesh,colMesh)))>1
+                                        LDBdata(:,:,i4) = permute(round(griddata(r,c,v,rowMesh,colMesh)),[2,1,3]);
+                                    end
+                                    warning('on','all');
+                                end
+                            end
+                        end
+
+                        LDBdata(isnan(LDBdata)) = 0;
+                        ldbDraw = LDBdata;
+
+                        reDrawLines
+                        pause(0.001)
+                        hold(ha,'on')
+                        xIntersect = NaN(max(totBands3),1);
+                        yIntersect = NaN(max(totBands3),1);
+                        for i4 = totBands3'
+                            if max(max(userBands(:,:,i4)))>0
+                                [r,c] = find(LDBdata(:,slab,i4));
+                                hold(ha,'on')
+                                if length(r)>0
+                                    if max(max(LDBdata(:,:,i4)))>0
+                                        xIntersect(i4) = median(r)*hpxS;
+                                        yIntersect(i4) = (LDBdata(round(median(r)),slab,i4)-layers)*-pxS;
+                                        text(ha,xIntersect(i4),yIntersect(i4),num2str(i4),'Color','yellow','Clipping','on');
+                                    end
+                                end
+                                hold(ha,'off')
+                            end
+                        end
+                    end
+
+                else
+
+                    if max(max(max(userBands)))>0
+                        totBands3 = find(max(max(userBands)));
+                        LDBdata = zeros(row,col,length(userBands(1,1,1:max(totBands3))));
+                        band_filt4plot = zeros(size(LDBdata));
+                        surf_filt = h3;
+                        for i4 = totBands3'
+                            if max(max(userBands(:,:,i4)))>0
+                                [r,c] = find(userBands(:,:,i4));
+                                if isempty(r)
+                                    break
+                                end
+                                v = zeros(1,length(r));
+                                for j2 = 1:length(r)
+                                    v(j2) = userBands(r(j2),c(j2),i4);
+                                end
+                                warning('off','all');
+                                if length(round(griddata(r,c,v,rowMesh,colMesh)))>1
+                                    LDBdata(:,:,i4) = permute(round(griddata(r,c,v,rowMesh,colMesh)),[2,1,3]);
+                                end
+                                warning('on','all');
+                            end
+                            band_filt4plot(:,:,i4) = nanconv(LDBdata(:,:,i4), surf_filt, 'nanout');
+                        end
+
+                        LDBdata(isnan(LDBdata)) = 0;
+                        band_filt4plot(isnan(band_filt4plot)) = 0;
+
+                        ldbDraw = band_filt4plot;
+
+                        reDrawLines
+                        set(bandsPlot,'Color',[1 0.65 0])
+                        pause(0.001)
+                        hold(ha,'on')
+                        xIntersect = NaN(max(totBands3),1);
+                        yIntersect = NaN(max(totBands3),1);
+                        for i4 = totBands3'
+                            if max(max(userBands(:,:,i4)))>0
+                                [r,c] = find(LDBdata(:,slab,i4));
+                                hold(ha,'on')
+                                if length(r)>0
+                                    if max(max(LDBdata(:,:,i4)))>0
+                                        xIntersect(i4) = median(r)*hpxS;
+                                        yIntersect(i4) = (LDBdata(round(median(r)),slab,i4)-layers)*-pxS;
+                                        text(ha,xIntersect(i4),yIntersect(i4),num2str(i4),'Color',[1 0.65 0],'Clipping','on');
+                                    end
+                                end
+                                hold(ha,'off')
+                            end
+                        end
+                    end
+                end
+
+            else
+                if smoothedBandsDrawn == 0
+
+                    smoothed_on = 0;
+                    reDrawLines
+                    pause(0.001)
+                    hold(ha,'on')
+                    totBands3 = find(max(userBands));
+                    xIntersect = NaN(max(totBands3),1);
+                    yIntersect = NaN(max(totBands3),1);
+                    for i4 = totBands3
+                        if max(max(userBands(:,i4)))>0
+                            c = find(userBands(:,i4));
+                            hold(ha,'on')
+                            if length(c)>0
+                                xIntersect(i4) = median(c)*hpxS;
+                                interpLab = interp1(c,userBands(c,i4),round(median(c)));
+                                text(ha,xIntersect(i4),interpLab*pxS,num2str(i4),'Color','y','Clipping','on');
+                            end
+                            hold(ha,'off')
+                        end
+                    end
+
+                else
+
+                    smoothed_on = 1;
+                    totBands3 = find(max(userBands));
+                    LDBdata = zeros(col,max(totBands3));
+                    band_filt = NaN(size(LDBdata));
+                    h2d = sum(h3);
+                    h2mid = ceil(length(h3(:,1))/2);
+                    for i4 = totBands3
+                        if max(max(userBands(:,i4)))>0
+                            c = find(userBands(:,i4));
+                            if isempty(c)
+                                break
+                            end
+                            this_band_interp = interp1(c,userBands(c,i4),min(c):max(c));
+
+                            for i5 = min(c):max(c)
+                                h2x = i5-h2mid:i5-h2mid+length(h2d)-1;
+                                thisH2d = h2d;
+                                thisH2d(h2x < min(c)) = [];
+                                h2x(h2x < min(c)) = [];
+                                thisH2d(h2x > max(c)) = [];
+                                h2x(h2x > max(c)) = [];
+                                h2x = h2x-min(c)+1;
+                                thisH2d = thisH2d./sum(thisH2d);
+                                band_filt(i5,i4) = sum(this_band_interp(h2x).*thisH2d);
+                            end
+                        end
+                    end
+                    LDBdata = band_filt;
+
+                    reDrawLines
+                    set(bandsPlot,'Color',[1 0.65 0])
+
+                    pause(0.001)
+                    hold(ha,'on')
+                    xIntersect = NaN(max(totBands3),1);
+                    yIntersect = NaN(max(totBands3),1);
+                    for i4 = totBands3
+                        if max(max(userBands(:,i4)))>0
+                            c = find(LDBdata(:,i4));
+                            hold(ha,'on')
+                            if length(c)>0
+                                if max(LDBdata(:,i4))>0
+                                    xIntersect(i4) = median(c)*hpxS;
+                                    yIntersect(i4) = (LDBdata(round(median(c)),i4))*pxS;
+                                    text(ha,xIntersect(i4),yIntersect(i4),num2str(i4),'Color',[1 0.65 0],'Clipping','on');
+                                end
+                            end
+                            hold(ha,'off')
+                        end
+                    end
+
+                end
+
+            end
+
+            drawnow;
+
+            function reDrawLines
+                if haveLims == 0
+                    xs = [min([1:row].*hpxS),max([1:row].*hpxS)];
+                    ys = [min([1:layers].*pxS),max([1:layers].*pxS)];
+                else
+                    ys = get(ha,'YLim');
+                    xs = get(ha,'XLim');
+                end
+                hold(ha,'on')
+                band_lines = [NaN,NaN];
+                counter = 1;
+                if ct == 1
+                    totBands3 = find(max(max(userBands)));
+                else
+                    totBands3 = find(max(userBands));
+                end
+                if ct == 1
+                    for i4 = totBands3'
+                        if max(max(userBands(:,:,i4)))>0
+                            r = find(ldbDraw(:,slab,i4));
+                            if length(r)>0
+                                for i6 = 1:length(r)
+                                    counter = counter+1;
+                                    band_lines(counter,:) = [r(i6)*hpxS,(layers-ldbDraw(r(i6),slab,i4))*pxS];
+                                end
+                                band_lines(counter+1,:) = [NaN,NaN];
+                                counter = counter+1;
+                            end
+                        end
+                    end
+                else
+                    for i4 = totBands3
+                        if max(userBands(:,i4))>0
+                            if smoothed_on == 0
+                                c = find(userBands(:,i4));
+                                band_lines(counter+1:counter+length(c),:) = [c*hpxS,userBands(c,i4)*pxS];
+                            else
+                                c = find(LDBdata(:,i4));
+                                band_lines(counter+1:counter+length(c),:) = [c*hpxS,LDBdata(c,i4)*pxS];
+                            end
+                            band_lines(counter+1+length(c),:) = [NaN,NaN];
+                            counter = counter+length(c)+1;
+                        end
+                    end
+                end
+                band_lines(band_lines(:,2) > ys(2),:) = NaN;
+                band_lines(band_lines(:,1) > xs(2),:) = NaN;
+                band_lines(band_lines(:,2) < ys(1),:) = NaN;
+                band_lines(band_lines(:,1) < xs(1),:) = NaN;
+                bandsPlot = plot(ha,band_lines(:,1),band_lines(:,2),'-','Color','y');
+                if length(band_lines)>2
+                    interpBandsPlotted = 1;
+                end
+                hold(ha,'off')
+            end
+
+        end
+
 
         hideInterpIn = uicontrol(UserFig,'Style','pushbutton',...
             'String',{'Hide interpolated bands'},'Visible','off',...
@@ -6311,6 +9544,333 @@ areWeGoingBack = 0;
             set(hideInterpIn,'Visible','on')
             set(showInterpIn,'Visible','off')
         end
+
+        % button to adjust filtering
+        filterEditIn = uicontrol(UserFig,'Style','pushbutton',...
+            'String',{'Edit smoothing'},...
+            'Position',[500,15,160,30],'Units','normalized',...
+            'BackgroundColor',[255, 189, 68]/256,'FontSize',12,...
+            'FontName','Arial','Callback',@editFilters,...
+            'Visible','on');
+
+        filterEditOut = uicontrol(UserFig,'Style','pushbutton',...
+            'String',{'Go back'},...
+            'Position',[500,15,160,30],'Units','normalized',...
+            'BackgroundColor',[255, 189, 68]/256,'FontSize',12,...
+            'FontName','Arial','Callback',@cancelEditFilters_fun,...
+            'Visible','off');
+
+        aboutEditFiltersIn = uicontrol(UserFig,'Style','pushbutton',...
+            'String',{'What is this?'},'Visible','off',...
+            'Position',[700,400,100,30],'Units','normalized','BackgroundColor','none','ForegroundColor',[0,0,0],'FontSize',12,'FontName','Arial','Callback',@aboutSmoothEdit_fun);
+
+        aboutEditFiltersOut = uicontrol(UserFig,'Style','pushbutton',...
+            'String',{'Go back'},'Visible','off',...
+            'Position',[700,250,100,30],'Units','normalized','BackgroundColor','none','ForegroundColor',[0,0,0],'FontSize',12,'FontName','Arial','Callback',@cancelAboutSmoothEdit_fun);
+
+        wasUndoOn = 0;
+        wasDrawBoxOn1 = 0;
+        wasDrawBoxOn2 = 0;
+        washideInterpOn = 0;
+        wasMainScreen = 0;
+        wasAutoOn = 0;
+        wasSmoothingOn = 0;
+
+        function editFilters(src,event)
+
+            %iptSetPointerBehavior(corePlot, @(UserFig, currentPoint)set(UserFig, 'Pointer', 'watch'));
+            %iptSetPointerBehavior(bandsPlot, @(UserFig, currentPoint)set(UserFig, 'Pointer', 'watch'));
+
+            set(corePlot,'ButtonDownFcn','')
+            set(bandsPlot,'ButtonDownFcn','')
+
+            if strcmp(get(UndoLastClickIn,'Visible'),'on')
+                wasUndoOn = 1;
+            else
+                wasUndoOn = 0;
+            end
+            if strcmp(get(redoBandIn,'Visible'),'on')
+                wasDrawBoxOn1 = 1;
+            else
+                wasDrawBoxOn1 = 0;
+            end
+            if strcmp(get(redoBandIn,'Visible'),'on')
+                wasDrawBoxOn2 = 1;
+            else
+                wasDrawBoxOn2 = 0;
+            end
+            if strcmp(get(hideInterpIn,'Visible'),'on')
+                washideInterpOn = 1;
+            else
+                washideInterpOn = 0;
+            end
+            if strcmp(get(dispInterpClicksIn,'Visible'),'on')
+                wasSmoothingOn = 1;
+            else
+                wasSmoothingOn = 0;
+            end
+
+            if strcmp(get(projIn,'Visible'),'on')
+                wasMainScreen = 1;
+                set(htext1,'Visible','off')
+                set(htext2,'Visible','off')
+                set(htext3,'Visible','off')
+                set(htext4,'Visible','off')
+                set(htext5,'Visible','off')
+                set(htext6,'Visible','off')
+                set(htext7,'Visible','off')
+                set(htext8,'Visible','off')
+                set(htext9,'Visible','off')
+                set(brightnessIn,'Visible','off')
+                set(contrastIn,'Visible','off')
+                set(thickIn,'Visible','off')
+                set(positionIn,'Visible','off')
+                set(rotationIn,'Visible','off')
+                set(lblBright,'Visible','off')
+                set(lblContrast,'Visible','off')
+                set(lblThick,'Visible','off')
+                set(lblPos,'Visible','off')
+                set(lblRot,'Visible','off')
+                set(projIn,'Visible','off')
+                set(jumpSetIn,'Visible','off')
+                set(jumpIn,'Visible','off')
+                set(htext8b,'Visible','off')
+                set(deleteSetIn,'Visible','off')
+                set(deleteIn,'Visible','off')
+                set(eraseSetIn,'Visible','off')
+                set(eraseIn,'Visible','off')
+                set(insertSetIn,'Visible','off')
+                set(insertIn,'Visible','off')
+                set(clickIn,'Visible','off')
+                set(lblClick,'Visible','off')
+                set(defaultIn,'Visible','off')
+                set(doneIn,'Visible','off')
+                set(processIn,'Visible','off')
+                set(dispSmoothBandsIn,'Visible','off')
+                set(dispInterpClicksIn,'Visible','off')
+                set(viewNotesIn,'Visible','off')
+                set(lblAutoDetection,'Visible','off')
+                if strcmp(get(autoDisableIn,'Visible'),'on')
+                    wasAutoOn = 1;
+                end
+                set(autoDisableIn,'Visible','off')
+                set(autoEnableIn,'Visible','off')
+                set(saveScreenshotIn,'Visible','off')
+                set(viewScreenshotsIn,'Visible','off')
+                set(lblAutoDetectionEnabled,'Visible','off')
+                set(lblAutoDetectionDisabled,'Visible','off')
+            else
+                wasMainScreen = 0;
+            end
+
+            set(calibrateProposedIn,'Visible','off')
+            set(calibrateProposedOut,'Visible','off')
+            set(filterEditIn,'Visible','off')
+            set(filterEditOut,'Visible','on')
+            set(aboutEditFiltersOut,'Visible','off')
+            set(hideInterpIn,'Visible','off')
+            set(showInterpIn,'Visible','off')
+            set(saveScreenshotIn,'Visible','off')
+            set(viewScreenshotsIn,'Visible','off')
+            set(doneBandIn,'Visible','off')
+            set(redoBandIn,'Visible','off')
+            set(UndoLastClickIn,'Visible','off')
+            set(drawDeleteBox1In,'Visible','off')
+            set(drawDeleteBox2In,'Visible','off')
+
+            drawnow
+            pause(0.01)
+
+            if ct == 1
+                set(ha2,'Units','Pixels','Position',[875,40,200,200],'Units','normalized')
+            end
+
+            smoothParam1In = uicontrol(UserFig,'Style','slider',...
+                'Position',[700,550,300,20],'Units','normalized',...
+                'Min', 1,'Max', 10,'Value', h3_width/10,'Callback', @smoothParam1_Callback);
+
+            smoothParam2In = uicontrol(UserFig,'Style','slider',...
+                'Position',[700,475,300,20],'Units','normalized',...
+                'Min', 1,'Max', 5,'Value', h3_std/10,'Callback', @smoothParam2_Callback);
+
+            lblParam1 = uicontrol(UserFig,'Style','text','String',sprintf('Filter width: %s mm',num2str(smoothParam1In.Value)),'Position',[700,575,300,20],...
+                'FontSize',10,'FontName','Arial','Units','normalized','BackgroundColor','none','ForegroundColor','w');
+
+            lblParam2 = uicontrol(UserFig,'Style','text','String',sprintf('Filter standard deviation: %s mm',num2str(smoothParam2In.Value)),'Position',[700,500,300,20],...
+                'FontSize',10,'FontName','Arial','Units','normalized','BackgroundColor','none','ForegroundColor','w');
+
+            set(aboutEditFiltersIn,'Visible','on')
+
+            if wasSmoothingOn == 0
+                dispSmoothBands;
+            end
+
+        end
+
+        function smoothParam1_Callback(src,event)
+            conversion_factor = (1./hpxS).*0.1; %(pixels per 0.1mm)
+            h3_width = smoothParam1In.Value*10;
+            h3_std = smoothParam2In.Value*10;
+            h3 = fspecial('gaussian',round(h3_width*conversion_factor), h3_std*conversion_factor);
+            set(lblParam1,'String',sprintf('Filter width: %s mm',num2str(round(h3_width*10)/100)))
+            set(lblParam2,'String',sprintf('Filter standard deviation: %s mm',num2str(round(h3_std*10)/100)))
+            updateBandLines
+        end
+
+        function smoothParam2_Callback(src,event)
+            conversion_factor = (1./hpxS).*0.1; %(pixels per 0.1mm)
+            h3_width = smoothParam1In.Value*10;
+            h3_std = smoothParam2In.Value*10;
+            h3 = fspecial('gaussian',round(h3_width*conversion_factor), h3_std*conversion_factor);
+            set(lblParam1,'String',sprintf('Filter width: %s mm',num2str(round(h3_width*10)/100)))
+            set(lblParam2,'String',sprintf('Filter standard deviation: %s mm',num2str(round(h3_std*10)/100)))
+            updateBandLines
+        end
+
+        function cancelEditFilters_fun(src,event)
+
+            iptSetPointerBehavior(corePlot, @(UserFig, currentPoint)set(UserFig, 'Pointer', 'custom', 'PointerShapeCData', band_pointer, 'PointerShapeHotSpot', band_pointer_hotspot));
+            iptSetPointerBehavior(bandsPlot, @(UserFig, currentPoint)set(UserFig, 'Pointer', 'custom', 'PointerShapeCData', band_pointer, 'PointerShapeHotSpot', band_pointer_hotspot));
+
+            set(filterEditIn,'Visible','on')
+            set(filterEditOut,'Visible','off')
+            set(calibrateProposedIn,'Visible','off')
+            set(calibrateProposedOut,'Visible','off')
+            set(smoothParam1In,'Visible','off')
+            set(smoothParam2In,'Visible','off')
+            set(lblParam1,'Visible','off')
+            set(lblParam2,'Visible','off')
+            set(aboutEditFiltersIn,'Visible','off')
+            set(aboutEditFiltersOut,'Visible','off')
+            set(htextAbout2,'Visible','off')
+            if wasMainScreen == 1
+                set(htext1,'Visible','on')
+                set(htext2,'Visible','on')
+                set(htext3,'Visible','on')
+                set(htext4,'Visible','on')
+                set(htext5,'Visible','on')
+                set(htext6,'Visible','on')
+                set(htext7,'Visible','on')
+                set(htext8,'Visible','on')
+                set(htext9,'Visible','on')
+                set(brightnessIn,'Visible','on')
+                set(contrastIn,'Visible','on')
+                set(thickIn,'Visible','on')
+                set(positionIn,'Visible','on')
+                set(rotationIn,'Visible','on')
+                set(lblBright,'Visible','on')
+                set(lblContrast,'Visible','on')
+                set(lblThick,'Visible','on')
+                set(lblPos,'Visible','on')
+                set(lblRot,'Visible','on')
+                set(projIn,'Visible','on')
+                set(jumpSetIn,'Visible','on')
+                set(jumpIn,'Visible','on')
+                set(htext8b,'Visible','on')
+                set(deleteSetIn,'Visible','on')
+                set(deleteIn,'Visible','on')
+                set(eraseSetIn,'Visible','on')
+                set(eraseIn,'Visible','on')
+                set(insertSetIn,'Visible','on')
+                set(insertIn,'Visible','on')
+                set(clickIn,'Visible','on')
+                set(lblClick,'Visible','on')
+                set(defaultIn,'Visible','on')
+                set(doneIn,'Visible','on')
+                set(processIn,'Visible','on')
+                set(lblAutoDetection,'Visible','on')
+                if wasSmoothingOn == 0
+                    dispIntClicks
+                    set(dispSmoothBandsIn,'Visible','on')
+                    set(dispInterpClicksIn,'Visible','off')
+                else
+                    set(dispSmoothBandsIn,'Visible','off')
+                    set(dispInterpClicksIn,'Visible','on')
+                end
+                set(viewNotesIn,'Visible','on')
+                if wasAutoOn
+                    set(autoDisableIn,'Visible','on')
+                    set(lblAutoDetectionEnabled,'Visible','on')
+                else
+                    set(autoEnableIn,'Visible','on')
+                    set(lblAutoDetectionDisabled,'Visible','on')
+                end
+                set(saveScreenshotIn,'Visible','on')
+                set(viewScreenshotsIn,'Visible','on')
+            else
+                if washideInterpOn == 1
+                    set(hideInterpIn,'Visible','on')
+                else
+                    set(showInterpIn,'Visible','on')
+                end
+                set(saveScreenshotIn,'Visible','on')
+                set(viewScreenshotsIn,'Visible','on')
+                set(doneBandIn,'Visible','on')
+                set(redoBandIn,'Visible','on')
+
+                if wasUndoOn == 1
+                    set(UndoLastClickIn,'Visible','on')
+                else
+                    set(UndoLastClickIn,'Visible','off')
+                end
+                if wasDrawBoxOn1 == 1
+                    set(drawDeleteBox1In,'Visible','on')
+                else
+                    set(drawDeleteBox1In,'Visible','off')
+                end
+                if wasDrawBoxOn2 == 1
+                    set(drawDeleteBox2In,'Visible','on')
+                else
+                    set(drawDeleteBox2In,'Visible','off')
+                end
+
+                set(ha2,'Units','Pixels','Position',[675,100,400,400],'Units','normalized')
+            end
+        end
+
+        function cancelAboutSmoothEdit_fun(src,event)
+
+            set(filterEditIn,'Visible','off')
+            set(filterEditOut,'Visible','on')
+            set(smoothParam1In,'Visible','on')
+            set(smoothParam2In,'Visible','on')
+            set(lblParam1,'Visible','on')
+            set(lblParam2,'Visible','on')
+            set(aboutEditFiltersIn,'Visible','on')
+            set(aboutEditFiltersOut,'Visible','off')
+            set(htextAbout2,'Visible','off')
+
+        end
+
+        function aboutSmoothEdit_fun(src,event)
+
+            set(filterEditIn,'Visible','off')
+            set(filterEditOut,'Visible','off')
+            set(smoothParam1In,'Visible','off')
+            set(smoothParam2In,'Visible','off')
+            set(lblParam1,'Visible','off')
+            set(lblParam2,'Visible','off')
+            set(aboutEditFiltersIn,'Visible','off')
+            set(aboutEditFiltersOut,'Visible','on')
+
+            about_text_label2 = sprintf(['Smoothing bands works by filtering the locations ' ...
+                'of clicks placed along each band. Here, you can choose two different ' ...
+                'parameters of the smoothing filter. The idea is to smooth your bands to ' ...
+                'approximately match the smoothness of the coral bands visible in the underlying ' ...
+                'image. The larger the filter parameters, the smoother your bands will be. ' ...
+                'Extension rate analyses are based on these smoothed bands, so this will influence ' ...
+                'the output data. ']);
+
+            set(htextAbout2,'String',about_text_label2)
+
+            about_text_wrapped2 = textwrap(htextAbout2,{htextAbout2.String});
+
+            set(htextAbout2,'String',about_text_label2,'Visible','on','Units','pixels',...
+                'Position',[650,300,400,300],'Units','normalized','HorizontalAlignment', 'left','BackgroundColor','none','ForegroundColor','w')
+
+        end
+
+
 
         % Create functions that toggle sets of displays on or off:
         % default mode is what opens initially with ability to edit image
@@ -6334,6 +9894,7 @@ areWeGoingBack = 0;
             set(dispSmoothBandsIn,'Enable','off')
             set(dispInterpClicksIn,'Enable','off')
             set(viewNotesIn,'Enable','off')
+            set(filterEditIn,'Enable','off')
             set(autoDisableIn,'Enable','off')
             set(autoEnableIn,'Enable','off')
             set(saveScreenshotIn,'Enable','off')
@@ -6357,6 +9918,7 @@ areWeGoingBack = 0;
             set(dispSmoothBandsIn,'Enable','on')
             set(dispInterpClicksIn,'Enable','on')
             set(viewNotesIn,'Enable','on')
+            set(filterEditIn,'Enable','on')
             set(autoDisableIn,'Enable','on')
             set(autoEnableIn,'Enable','on')
             set(saveScreenshotIn,'Enable','on')
@@ -6386,6 +9948,7 @@ areWeGoingBack = 0;
                 set(lblPos,'Visible','on')
                 set(lblRot,'Visible','on')
                 set(ha2,'Units','Pixels','Position',[875,40,200,200],'Units','normalized')
+                circlePlot
             end
             set(htext7,'Visible','on')
             set(htext8,'Visible','on')
@@ -6425,12 +9988,20 @@ areWeGoingBack = 0;
             set(insertSetIn,'Visible','on')
             set(insertIn,'Visible','on')
             set(viewNotesIn,'Visible','on')
+            set(filterEditIn,'Visible','on')
             set(hideNotesIn,'Visible','off')
             set(htextNotes,'Visible','off')
             set(hideInterpIn,'Visible','off')
             set(showInterpIn,'Visible','off')
             set(saveScreenshotIn,'Visible','on')
             set(viewScreenshotsIn,'Visible','on')
+            %set(filterEditIn,'Visible','off')
+            set(filterEditOut,'Visible','off')
+            set(zoomInIn,'Visible','on')
+            set(zoomInOut,'Visible','off')
+            set(panIn,'Visible','on')
+            set(panOut,'Visible','off')
+            set(zoomOutIn,'Visible','on')
 
             if view_only == 1
                 set(jumpSetIn,'Visible','off')
@@ -6525,6 +10096,11 @@ areWeGoingBack = 0;
             set(insertIn,'Visible','off')
             set(hideInterpIn,'Visible','off')
             set(showInterpIn,'Visible','off')
+            set(zoomInIn,'Visible','off')
+            set(zoomInOut,'Visible','off')
+            set(panIn,'Visible','off')
+            set(panOut,'Visible','off')
+            set(zoomOutIn,'Visible','off')
         end
 
         function clickingMode
@@ -6567,6 +10143,7 @@ areWeGoingBack = 0;
             if ct == 1
                 set(drawDeleteBox2In,'Visible','on')
                 set(ha2,'Units','Pixels','Position',[675 100 400 400],'Units','normalized')
+                %circlePlot
             end
             set(processIn,'Visible','off')
             set(dispSmoothBandsIn,'Visible','off')
@@ -6580,12 +10157,26 @@ areWeGoingBack = 0;
             set(swapBandsIn,'Visible','off')
             set(shiftBandsIn,'Visible','off')
             set(viewNotesIn,'Visible','off')
+            %set(filterEditIn,'Enable','off')
             set(hideNotesIn,'Visible','off')
             set(htextNotes,'Visible','off')
             if interpBandsPlotted == 1
                 set(hideInterpIn,'Visible','on')
                 set(showInterpIn,'Visible','off')
             end
+            if smoothedBandsDrawn == 1
+                set(filterEditIn,'Visible','on')
+            else
+                set(filterEditIn,'Visible','off')
+            end
+            set(filterEditOut,'Visible','off')
+            %currentLimX = get(ha,'XLim');
+            %currentLimY = get(ha,'YLim');
+            set(zoomInIn,'Visible','off')
+            set(zoomInOut,'Visible','off')
+            set(panIn,'Visible','off')
+            set(panOut,'Visible','off')
+            set(zoomOutIn,'Visible','off')
 
         end
 
@@ -6614,6 +10205,8 @@ areWeGoingBack = 0;
         % Function to update display of image and intersections of bands
         function drawAndLabelBands
 
+            set(lblLoading,'Visible','on')
+            pause(0.01)
             if previous_bands_fixing_mode == 1
                 inds2delete = [];
                 totBands3 = find(max(max(userBands)));
@@ -6628,7 +10221,7 @@ areWeGoingBack = 0;
                 userBands(:,:,inds2delete) = [];
                 totBands =length(find(max(max(userBands)))>0);
                 if length(inds2delete) > 0
-                    save(fullfile(fileOpen,name2search), 'userBands','x_ang','CoralCTversion','contra','proj','thick');
+                    save(fullfile(fileOpen,name2search), 'userBands','x_ang','CoralCTversion','contra','proj','thick','h3_width','h3_std','h3_defined');
                 end
                 inds2delete = [];
             end
@@ -6678,19 +10271,28 @@ areWeGoingBack = 0;
             else
                 dispSlab
             end
-            set(dispInterpClicksIn,'Visible','off')
-            set(dispSmoothBandsIn,'Visible','on')
-            smoothedBandsDrawn = 0;
+            if smoothedBandsDrawn == 0
+                set(dispSmoothBandsIn,'Visible','on')
+                set(dispInterpClicksIn,'Visible','off')
+            else
+                set(dispSmoothBandsIn,'Visible','off')
+                set(dispInterpClicksIn,'Visible','on')
+            end
+            %smoothedBandsDrawn = 0;
+            set(lblLoading,'Visible','off')
         end
 
 
         function drawAndLabelSmoothedBands
 
+            set(lblLoading,'Visible','on')
+            pause(0.01)
+
             if max(max(max(userBands)))>0
                 totBands3 = find(max(max(userBands)));
                 LDBdata = zeros(row,col,length(userBands(1,1,1:max(totBands3))));
                 band_filt4plot = zeros(size(LDBdata));
-                surf_filt = h2;
+                surf_filt = h3;
                 for i4 = totBands3'
                     if max(max(userBands(:,:,i4)))>0
                         [r,c] = find(userBands(:,:,i4));
@@ -6739,9 +10341,20 @@ areWeGoingBack = 0;
                 dispSlab
                 set(bandsPlot,'Color','m')
             end
+            if smoothedBandsDrawn == 0
+                set(dispSmoothBandsIn,'Visible','on')
+                set(dispInterpClicksIn,'Visible','off')
+            else
+                set(dispSmoothBandsIn,'Visible','off')
+                set(dispInterpClicksIn,'Visible','on')
+            end
+            set(lblLoading,'Visible','off')
         end
 
         function drawAndLabelBandsXray
+            set(lblLoading,'Visible','on')
+            pause(0.01)
+
             smoothed_on = 0;
             dispSlab
             pause(0.001)
@@ -6761,16 +10374,26 @@ areWeGoingBack = 0;
                     hold(ha,'off')
                 end
             end
+            if smoothedBandsDrawn == 0
+                set(dispSmoothBandsIn,'Visible','on')
+                set(dispInterpClicksIn,'Visible','off')
+            else
+                set(dispSmoothBandsIn,'Visible','off')
+                set(dispInterpClicksIn,'Visible','on')
+            end
+            set(lblLoading,'Visible','off')
         end
 
         function drawAndLabelSmoothedBandsXray
+            set(lblLoading,'Visible','on')
+            pause(0.01)
 
             smoothed_on = 1;
             totBands3 = find(max(userBands));
             LDBdata = zeros(col,max(totBands3));
             band_filt = NaN(size(LDBdata));
-            h2d = sum(h2);
-            h2mid = ceil(length(h2(:,1))/2);
+            h2d = sum(h3);
+            h2mid = ceil(length(h3(:,1))/2);
             for i4 = totBands3
                 if max(max(userBands(:,i4)))>0
                     c = find(userBands(:,i4));
@@ -6815,6 +10438,14 @@ areWeGoingBack = 0;
                     hold(ha,'off')
                 end
             end
+            if smoothedBandsDrawn == 0
+                set(dispSmoothBandsIn,'Visible','on')
+                set(dispInterpClicksIn,'Visible','off')
+            else
+                set(dispSmoothBandsIn,'Visible','off')
+                set(dispInterpClicksIn,'Visible','on')
+            end
+            set(lblLoading,'Visible','off')
         end
 
         corePlot = [];
@@ -6822,10 +10453,38 @@ areWeGoingBack = 0;
         % Function to update display of image
         function dispSlab
 
+            if haveLims == 0
+                xs = [min([1:row].*hpxS),max([1:row].*hpxS)];
+                ys = [min([1:layers].*pxS),max([1:layers].*pxS)];
+            else
+                ys = get(ha,'YLim');
+                xs = get(ha,'XLim');
+                %set(ha,'Visible','off')
+                % ha_copy = uiaxes('Position',get(ha,'Position'));
+                % xInds = round(xs(1)./hpxS):round(xs(2)./hpxS);
+                % yInds = round(ys(1)./pxS):round(ys(2)./pxS);
+                % xInds(xInds<1) = 1;
+                % xInds(xInds>row) = row;
+                % yInds(yInds<1) = 1;
+                % yInds(yInds>layers) = layers;
+                % corePlot2 = pcolor(ha_copy,xInds.*hpxS,yInds.*pxS,slabDraw(yInds,xInds));
+                % set(ha_copy,'XLim',xs,'YLim',ys)
+                % axis equal
+                % if ct == 1
+                %     set(corePlot2,'EdgeColor','none')
+                %     set(corePlot2,'EdgeColor','interp')
+                % end
+                % set(ha_copy,'PlotBoxAspectRatio',[1 1 1])
+                % set(ha_copy,'DataAspectRatio',[1 1 1])
+                % set(ha_copy,'Colormap',colormap('bone'))
+                % set(ha_copy,'CLim',contra);
+                % drawnow
+            end
+            
             interpBandsPlotted = 0;
             set(lblLoading,'Visible','on')
             if ct == 1
-                slabDraw = zeros(col,1,layers);
+                slabDraw = zeros(row,1,layers);
                 if strcmp(proj,'min')
                     slabDraw(:,:,1:layers)  = min(X(:,slab-thick:slab+thick,:),[],2);
                 elseif strcmp(proj,'mean')
@@ -6836,9 +10495,23 @@ areWeGoingBack = 0;
                 slabDraw = permute(slabDraw,[3,1,2]);
             end
             if ct == 1
-                corePlot = pcolor(ha,[1:col].*hpxS,[1:layers].*pxS,slabDraw);
+                xInds = round(xs(1)./hpxS):round(xs(2)./hpxS);
+                yInds = round(ys(1)./pxS):round(ys(2)./pxS);
+                xInds(xInds<1) = 1;
+                xInds(xInds>row) = row;
+                yInds(yInds<1) = 1;
+                yInds(yInds>layers) = layers;
+                %hold off
+                %axis equal
+                %if sum(get(ha,'DataAspectRatio')==[1,1,1])<3 || range(get(ha,'XLim')) ~= range(get(ha,'YLim'))
+                    %set(ha,'DataAspectRatio',[1,1,1]);
+                    axis(ha,'equal')
+                %end
+                %ha_copy = copyobj(ha,UserFig)
+                corePlot = pcolor(ha,xInds.*hpxS,yInds.*pxS,slabDraw(yInds,xInds));
                 ys = get(ha,'YLim');
                 xs = get(ha,'XLim');
+                haveLims = 1;
                 set(ha,'YColor','white')
                 ylabel('mm')
                 scalebar = patch(ha,xs(1)+[range(xs)*0.05, range(xs)*0.05, range(xs)*0.05+scale_mm,...
@@ -6877,7 +10550,26 @@ areWeGoingBack = 0;
                     'Color',themeColor1,'VerticalAlignment','bottom');
             end
 
-            title(coralName,'Color',themeColor1)
+            if strcmp(sectionName,'')
+                dispTitleName = coralName;
+            else
+                dispTitleName = [coralName,' ',sectionName];
+            end
+            dispTitleName0 = double(dispTitleName);
+            idxUnderScore = find(dispTitleName0==95);
+            if length(idxUnderScore)
+                dispTitleName = [];
+                idxUnderScore = [0, idxUnderScore];
+                for jjj = 2:length(idxUnderScore)
+                    dispTitleName = [dispTitleName, dispTitleName0(idxUnderScore(jjj-1)+1:idxUnderScore(jjj)-1),92, 95];
+                end
+                dispTitleName = char([dispTitleName, dispTitleName0(idxUnderScore(jjj)+1:end)]);
+            else
+                %dispTitleName = coralName;
+            end
+            
+            title(dispTitleName,'Color',themeColor1)
+
             hold(ha,'on')
             band_lines = [NaN,NaN];
             counter = 1;
@@ -6915,6 +10607,10 @@ areWeGoingBack = 0;
                     end
                 end
             end
+            band_lines(band_lines(:,2) > ys(2),:) = NaN;
+            band_lines(band_lines(:,1) > xs(2),:) = NaN;
+            band_lines(band_lines(:,2) < ys(1),:) = NaN;
+            band_lines(band_lines(:,1) < xs(1),:) = NaN;
             bandsPlot = plot(ha,band_lines(:,1),band_lines(:,2),'-','Color','y');
             if length(band_lines)>2
                 interpBandsPlotted = 1;
@@ -6931,6 +10627,10 @@ areWeGoingBack = 0;
             set(ha,'CLim',contra);
 
             drawnow
+            %set(ha,'Visible','on')
+            % if exist('ha_copy')
+            %     delete(ha_copy)
+            % end
 
             set(lblLoading,'Visible','off')
             if haveLims==1
@@ -6955,13 +10655,15 @@ areWeGoingBack = 0;
                     plot_bands(:,:,2) = userBands(:,:,j);
                     these_user_bands = max(plot_bands,[],3);
                     title_num = num2str(j);
+                    %coreSampLayer = round(median(these_user_bands(find(these_user_bands>0))));
                 else
                     these_user_bands = userBands(:,:,j-1);
                     title_num = num2str(j-1);
                 end
                 coreSampLayer = round(median(these_user_bands(find(these_user_bands>0))));
                 p_axial = pcolor(ha2,X(:,:,layers-coreSampLayer)');
-                title(ha2,sprintf('band %s',title_num));
+                title(ha2,sprintf('band %s',title_num),'Color',themeColor1);
+                %set(ha2,'XLim',xs)
                 [r_blue,c_blue] = find(these_user_bands>0);
                 hold(ha2,'on')
                 b_points = plot(ha2,r_blue,c_blue,'.','Color','y','MarkerSize',10);
@@ -6973,7 +10675,7 @@ areWeGoingBack = 0;
                 these_user_bands = max(plot_bands,[],3);
                 coreSampLayer = round(median(these_user_bands(find(these_user_bands>0))));
                 p_axial = pcolor(ha2,X(:,:,layers-coreSampLayer)');
-                title(ha2,sprintf('band %s',num2str(j)));
+                title(ha2,sprintf('band %s',num2str(j)),themeColor1);
                 [r_blue,c_blue] = find(these_user_bands>0);
                 hold(ha2,'on')
                 b_points = plot(ha2,r_blue,c_blue,'.','Color','y','MarkerSize',10);
@@ -7060,10 +10762,10 @@ areWeGoingBack = 0;
 
             pause(0.02)
 
-            if interpBandsPlotted == 1
-                set(hideInterpIn,'Visible','on')
-                set(showInterpIn,'Visible','off')
-            end
+            % if interpBandsPlotted == 1
+            %     set(hideInterpIn,'Visible','on')
+            %     set(showInterpIn,'Visible','off')
+            % end
 
             if strcmp(get(autoEnableIn,'Visible'),'on')
                 isEnableVis = 1;
@@ -7089,7 +10791,7 @@ areWeGoingBack = 0;
             hz.Enable = 'off';
             hp.Enable = 'off';
 
-            zoomPostCallback
+            %zoomPostCallback
 
             ha.InteractionOptions.ZoomSupported = "off";
             ha.InteractionOptions.PanSupported = "off";
@@ -7348,6 +11050,7 @@ areWeGoingBack = 0;
 
                 if ct == 1
                     if add2circle == 0
+                        circlePlot
                         add2circle = 1;
                         iptSetPointerBehavior(corePlot, @(UserFig, currentPoint)set(UserFig, 'Pointer', 'custom', 'PointerShapeCData', band_pointer, 'PointerShapeHotSpot', band_pointer_hotspot));
                         iptSetPointerBehavior(bandsPlot, @(UserFig, currentPoint)set(UserFig, 'Pointer', 'custom', 'PointerShapeCData', band_pointer, 'PointerShapeHotSpot', band_pointer_hotspot));
@@ -7368,13 +11071,13 @@ areWeGoingBack = 0;
             iptSetPointerBehavior(corePlot, @(UserFig, currentPoint)set(UserFig, 'Pointer', 'arrow'));
             iptSetPointerBehavior(bandsPlot, @(UserFig, currentPoint)set(UserFig, 'Pointer', 'arrow'));
             if oops == 0
-                [xSort,idx] = sort(x);
-                ySort = y(idx);
-                hold(ha,'on')
-                plot(ha,xSort,ySort,'-','Color','white')
-                delete(findobj(ha, 'type', 'Scatter'));
-                hold(ha,'off')
-                drawnow
+                %[xSort,idx] = sort(x);
+                %ySort = y(idx);
+                % hold(ha,'on')
+                % plot(ha,xSort,ySort,'-','Color','white')
+                % delete(findobj(ha, 'type', 'Scatter'));
+                % hold(ha,'off')
+                % drawnow
                 textClick = sprintf('Next band will be band %s',num2str(round(j+1)));
                 set(lblClick,'String',textClick)
 
@@ -7407,14 +11110,15 @@ areWeGoingBack = 0;
                 end
 
                 pause(0.01)
-                save(fullfile(fileOpen,name2search), 'userBands','x_ang','CoralCTversion','contra','proj','thick');
+                save(fullfile(fileOpen,name2search), 'userBands','x_ang','CoralCTversion','contra','proj','thick','h3_width','h3_std','h3_defined');
 
+                updateBandLines
                 set(lblLoading,'Visible','off')
-                hold(ha,'on')
-                if ~isempty(x)
-                    text(x(1),y(1),num2str(j),'Color','white','Clipping','on')
-                end
-                hold(ha,'off')
+                % hold(ha,'on')
+                % if ~isempty(x)
+                %     text(x(1),y(1),num2str(j),'Color','white','Clipping','on')
+                % end
+                % hold(ha,'off')
 
             else
                 hold(ha,'on')
@@ -7423,13 +11127,17 @@ areWeGoingBack = 0;
                 hold(ha,'off')
                 pause(3)
                 j = j-1;
-                drawAndLabelBands
+                if smoothedBandsDrawn == 0
+                    drawAndLabelBands
+                else
+                    drawAndLabelSmoothedBands
+                end
                 click_Callback
             end
             set(lblLoading,'Visible','off')
             defaultMode
-            ha.InteractionOptions.ZoomSupported = "on";
-            ha.InteractionOptions.PanSupported = "on";
+            %ha.InteractionOptions.ZoomSupported = "on";
+            %ha.InteractionOptions.PanSupported = "on";
             set(UndoLastClickIn,'Visible','off')
             set(drawDeleteBox1In,'Visible','off')
             if isEnableVis == 1
@@ -7440,10 +11148,24 @@ areWeGoingBack = 0;
 
         function clickXray_Callback(source,eventdata)
 
+            x1 = [];
+            y1 = [];
+
             iptSetPointerBehavior(corePlot, @(UserFig, currentPoint)set(UserFig, 'Pointer', 'watch'));
             iptSetPointerBehavior(bandsPlot, @(UserFig, currentPoint)set(UserFig, 'Pointer', 'watch'));
 
+            pause(0.01)
+
             clickingMode
+
+            pause(0.01)
+
+            if strcmp(get(autoEnableIn,'Visible'),'on')
+                isEnableVis = 1;
+                set(autoEnableIn,'Visible','off')
+            else
+                isEnableVis = 0;
+            end
 
             if interpBandsPlotted == 1
                 set(hideInterpIn,'Visible','on')
@@ -7458,8 +11180,13 @@ areWeGoingBack = 0;
                 uiresume(UserFig)
             end
 
+            pause(0.01)
             currentYlim = get(ha,'YLim');
             currentXlim = get(ha,'XLim');
+            pause(0.01)
+
+            hz.Enable = 'off';
+            hp.Enable = 'off';
 
             ha.InteractionOptions.ZoomSupported = "off";
             ha.InteractionOptions.PanSupported = "off";
@@ -7480,6 +11207,8 @@ areWeGoingBack = 0;
             iptSetPointerBehavior(corePlot, @(UserFig, currentPoint)set(UserFig, 'Pointer', 'custom', 'PointerShapeCData', band_pointer, 'PointerShapeHotSpot', band_pointer_hotspot));
             iptSetPointerBehavior(bandsPlot, @(UserFig, currentPoint)set(UserFig, 'Pointer', 'custom', 'PointerShapeCData', band_pointer, 'PointerShapeHotSpot', band_pointer_hotspot));
             b1 = 1;
+
+            pause(0.01)
 
             while areWeDone == 0
 
@@ -7596,10 +11325,11 @@ areWeGoingBack = 0;
             if oops == 0
                 [xSort,idx] = sort(x);
                 ySort = y(idx);
-                hold(ha,'on')
-                plot(ha,xSort,ySort,'-','Color','white')
-                hold(ha,'off')
-                drawnow
+                %hold(ha,'on')
+                %plot(ha,xSort,ySort,'-','Color','white')
+                %hold(ha,'off')
+                %drawnow
+                
                 textClick = sprintf('Next band will be band %s',num2str(round(j+1)));
                 set(lblClick,'String',textClick)
 
@@ -7613,12 +11343,14 @@ areWeGoingBack = 0;
                 end
 
                 pause(0.01)
-                save(fullfile(fileOpen,name2search), 'userBands','x_ang','CoralCTversion','contra','proj','thick');
+                save(fullfile(fileOpen,name2search), 'userBands','x_ang','CoralCTversion','contra','proj','thick','h3_width','h3_std','h3_defined');
 
+                updateBandLines
+                
                 set(lblLoading,'Visible','off')
-                hold(ha,'on')
-                text(x(1),y(1),num2str(j),'Color','white','Clipping','on')
-                hold(ha,'off')
+                %hold(ha,'on')
+                %text(x(1),y(1),num2str(j),'Color','white','Clipping','on')
+                %hold(ha,'off')
 
             else
                 hold(ha,'on')
@@ -7630,33 +11362,74 @@ areWeGoingBack = 0;
             end
             set(lblLoading,'Visible','off')
             defaultMode
-            ha.InteractionOptions.ZoomSupported = "on";
-            ha.InteractionOptions.PanSupported = "on";
+            %ha.InteractionOptions.ZoomSupported = "on";
+            %ha.InteractionOptions.PanSupported = "on";
             set(UndoLastClickIn,'Visible','off')
-
+            if isEnableVis == 1
+                set(autoEnableIn,'Visible','on')
+            end
         end
 
+        howManyTimesGoneBack = 0;
+        finishIn = [];
+        requestNotesAgain = [];
+        goBackIn = [];
+        deletePrevOutputs = [];
+        requestYearAgain = [];
+        topBandYearText = [];
+        topBandYearIn = [];
+        process_notesIn = [];
+        labelEnterNotes = [];
+        confidenceBands = [];
+        labelEnterConfidence = [];
+        notes_entered = [];
+        inputTopYear = [];
         function process_Callback(source,eventdata)
 
-            try cache1 = ftp(ftp_ip1,ftp_user1,ftp_password);
+            try cache1 = sftp(ftp_ip1,ftp_user1,"Password",ftp_password);
                 cd(cache1,'CoralCache')
             catch
-                try cache1 = ftp(ftp_ip1,ftp_user1,ftp_password);
+                try cache1 = sftp(ftp_ip1,ftp_user1,"Password",ftp_password);
                     cd(cache1,'CoralCache')
                 catch
-                    try cache1 = ftp(ftp_ip1,ftp_user1,ftp_password);
-                        cd(cache1,'CoralCache')
+                    try
+                        connectTimes = [1,2,3,5,10,60,60*12]; % minutes
+                        connectionEstablished = 0;
+                        for ij = 1:length(connectTimes)
+                            if connectionEstablished == 0
+                                if connectTimes(ij) == 1
+                                    waitText = [' ',num2str(connectTimes(ij)),' minute.']
+                                else
+                                    waitText = [' ',num2str(connectTimes(ij)),' minutes.']
+                                end
+                                set(lblOpeningError,'Units','Pixels','Visible','on','Position',[200,130,500,40],...
+                                    'String',{'Error connecting to server.';strcat('Trying again in',waitText)},...
+                                    'Units','normalized')
+                                pause(connectTimes(ij)*60)
+                                try
+                                    cache1 = sftp(ftp_ip1,ftp_user1,"Password",ftp_password);
+                                    connectionEstablished = 1;
+                                    set(lblOpeningError,'Units','Pixels','Visible','off',...
+                                        'Position',[200,150,500,20],'Units','normalized')
+                                catch
+                                end
+                            end
+                        end
+                        if connectionEstablished == 0
+                            zz = abjfl; % if we made it through end of loop, cause an error to display error code below
+                        end
                     catch
-                        set(lblOpeningError,'Visible','on','String',{'Error connecting to server. (code 006)';'Please try again later.'})
-                        pause
-                        while 1 ~= 2
+                        set(lblOpeningError,'Units','Pixels','Position',[200,130,500,40],'Visible','on',...
+                            'String',{'Error connecting to server. (code 030)';'Please try again later.'},...
+                            'Units','normalized')
+                        while 1==1
                             pause
                         end
                     end
                 end
             end
 
-            save(fullfile(fileOpen,name2search), 'userBands','x_ang','CoralCTversion','contra','proj','thick');
+            save(fullfile(fileOpen,name2search), 'userBands','x_ang','CoralCTversion','contra','proj','thick','h3_width','h3_std','h3_defined');
 
             exitClickMode
 
@@ -7715,6 +11488,7 @@ areWeGoingBack = 0;
 
             function goBack(src,event)
 
+                howManyTimesGoneBack = howManyTimesGoneBack +1;
                 set(finishIn,'Visible','off')
                 set(requestNotesAgain,'Visible','off')
                 set(goBackIn,'Visible','off')
@@ -7783,9 +11557,21 @@ areWeGoingBack = 0;
                     if inputTopYear>1900 && inputTopYear<2030
                         set(requestYearAgain,'Visible','off')
                         if notes_entered == 1
-                            uiresume(UserFig)
+                            % if howManyTimesGoneBack>0
+                            %     for ij = 1:howManyTimesGoneBack
+                            %         uiwait(UserFig)
+                            %     end
+                            % end
+                            %uiresume(UserFig)
+                            finishProcess
                         elseif overRideNotes == 1
-                            uiresume(UserFig)
+                            % if howManyTimesGoneBack>0
+                            %     for ij = 1:howManyTimesGoneBack
+                            %         uiwait(UserFig)
+                            %     end
+                            % end
+                            %uiresume(UserFig)
+                            finishProcess
                         else
                             set(requestNotesAgain,'Visible','on')
                             set(finishIn,'String','Press again to proceed')
@@ -7795,11 +11581,13 @@ areWeGoingBack = 0;
                         set(requestYearAgain,'Visible','on')
                     end
                 catch
-                    set(requestYearAgain,'Visible','on')
+                    %set(requestYearAgain,'Visible','on')
                 end
             end
+        end
 
-            uiwait(UserFig)
+        function finishProcess
+            %uiwait(UserFig)
 
             set(finishIn,'Visible','off')
             set(requestNotesAgain,'Visible','off')
@@ -7821,34 +11609,59 @@ areWeGoingBack = 0;
 
             try
                 if serverChoice == 1
-                    cache2 = ftp(ftp_ip2,ftp_user2,ftp_password);
+                    cache2 = sftp(ftp_ip2,ftp_user2,"Password",ftp_password);
                 elseif serverChoice == 2
-                    cache2 = ftp(ftp_ip2,ftp_user3,ftp_password);
+                    cache2 = sftp(ftp_ip2,ftp_user3,"Password",ftp_password);
                 elseif serverChoice == 3
-                    cache2 = ftp(ftp_ip1,ftp_user1,ftp_password);
+                    cache2 = sftp(ftp_ip1,ftp_user1,"Password",ftp_password);
                 end
             catch
                 try
                     if serverChoice == 1
-                        cache2 = ftp(ftp_ip2,ftp_user2,ftp_password);
+                        cache2 = sftp(ftp_ip2,ftp_user2,"Password",ftp_password);
                     elseif serverChoice == 2
-                        cache2 = ftp(ftp_ip2,ftp_user3,ftp_password);
+                        cache2 = sftp(ftp_ip2,ftp_user3,"Password",ftp_password);
                     elseif serverChoice == 3
-                        cache2 = ftp(ftp_ip1,ftp_user1,ftp_password);
+                        cache2 = sftp(ftp_ip1,ftp_user1,"Password",ftp_password);
                     end
                 catch
                     try
-                        if serverChoice == 1
-                            cache2 = ftp(ftp_ip2,ftp_user2,ftp_password);
-                        elseif serverChoice == 2
-                            cache2 = ftp(ftp_ip2,ftp_user3,ftp_password);
-                        elseif serverChoice == 3
-                            cache2 = ftp(ftp_ip1,ftp_user1,ftp_password);
+                        connectTimes = [1,2,3,5,10,60,60*12]; % minutes
+                        connectionEstablished = 0;
+                        for ij = 1:length(connectTimes)
+                            if connectionEstablished == 0
+                                if connectTimes(ij) == 1
+                                    waitText = [' ',num2str(connectTimes(ij)),' minute.']
+                                else
+                                    waitText = [' ',num2str(connectTimes(ij)),' minutes.']
+                                end
+                                set(lblOpeningError,'Units','Pixels','Visible','on','Position',[200,130,500,40],...
+                                    'String',{'Error connecting to server.';strcat('Trying again in',waitText)},...
+                                    'Units','normalized')
+                                pause(connectTimes(ij)*60)
+                                try
+                                    if serverChoice == 1
+                                        cache2 = sftp(ftp_ip2,ftp_user2,"Password",ftp_password)
+                                    elseif serverChoice == 2
+                                        cache2 = sftp(ftp_ip2,ftp_user3,"Password",ftp_password)
+                                    elseif serverChoice == 3
+                                        cache2 = sftp(ftp_ip1,ftp_user1,"Password",ftp_password);
+                                    end
+                                    connectionEstablished = 1;
+                                    set(lblOpeningError,'Units','Pixels','Visible','off',...
+                                        'Position',[200,150,500,20],'Units','normalized')
+                                catch
+                                end
+                            end
+                        end
+                        if connectionEstablished == 0
+                            zz = abjfl; % if we made it through end of loop, cause an error to display error code below
                         end
                     catch
-                        set(lblOpeningError,'Visible','on','String',{'Error connecting to server. (code 011)';'Please try again later.'})
-                        pause
-                        while 1 ~= 2
+                        set(lblOpeningError,'Units','Pixels','Position',[200,130,500,40],'Visible','on',...
+                            'String',{'Error connecting to server. (code 011)';'Please try again later.'},...
+                            'Units','normalized')
+                        while 1==1
                             pause
                         end
                     end
@@ -8002,11 +11815,12 @@ areWeGoingBack = 0;
             fid2 = fopen(fullfile(fileOpen,strcat('calcification_output_',saveName,char(datetime('today')),'.csv')),'w');
             % print column headers
             fprintf(fid2,'%s\n',strcat(['Using bands defined by ',saveName]));
-            fprintf(fid2,'%s\n',['name,','whole-core mean density (g cm^-3),','whole-core mean HU,','volume (cm^3),','number of images,','horizontal pixel spacing (mm),','vertical pixel spacing (mm),','confidence rating,','CT or Xray,','CoralCT version,']);
+            fprintf(fid2,'%s\n',['name,','whole-core mean density (g cm^-3),','whole-core mean HU,','volume (cm^3),','number of images,','horizontal pixel spacing (mm),','vertical pixel spacing (mm),','confidence rating,','CT or Xray,','CoralCT version,','Bands filter width (mm),','Bands filter std dev (mm),']);
             versionTextPrint = strcat(num2str(floor(CoralCTversion*10)/10),'.',num2str(round((CoralCTversion-floor(CoralCTversion*10)/10)*100)));
             fprintf(fid2, '%s\n',  strcat(coralName,...
                 ', ',num2str(densityWholeCore),', ',num2str(densityWholeCore*HU2dens(1)+HU2dens(2)),...
-                ', ',num2str(volume),', ',num2str(layers),', ',num2str(hpxS),', ',num2str(pxS),', ',num2str(confidenceBands.Value),', ',ctOrXray,', ',versionTextPrint));
+                ', ',num2str(volume),', ',num2str(layers),', ',num2str(hpxS),', ',num2str(pxS),', ',num2str(confidenceBands.Value),', ',ctOrXray,', ',versionTextPrint,...
+                ', ',num2str(h3_width/10), ', ',num2str(h3_std/10)));
             if notes_entered == 1
                 fprintf(fid2,'%s',strcat('Processing notes:',', ',process_notesIn.Value{1}));
                 if length(process_notesIn.Value) > 1
@@ -8141,7 +11955,7 @@ areWeGoingBack = 0;
                         end
                     end
                     delete(fullfile(refPath,'leaderboard_names.xlsx'))
-                else % add user to leaderboard
+                else % add user to leaderboard (removed from public version)
                     n_leaders_now = length(leader_raw(:,1));
                     mget(cache1,'user_directory_names.csv',refPath);
                     fid = fopen(fullfile(refPath,'user_directory_names.csv'));
@@ -8310,8 +12124,15 @@ areWeGoingBack = 0;
             set(shiftBandsIn,'Visible','off')
 
             set(viewNotesIn,'Visible','off')
+            set(filterEditIn,'Visible','off')
             set(hideNotesIn,'Visible','off')
             set(htextNotes,'Visible','off')
+
+            set(panIn,'Visible','off')
+            set(panOut,'Visible','off')
+            set(zoomInIn,'Visible','off')
+            set(zoomInOut,'Visible','off')
+            set(zoomOutIn,'Visible','off')
 
             delete(p1)
 
@@ -8409,9 +12230,17 @@ areWeGoingBack = 0;
 
         try
             if ct == 1
-                drawAndLabelBands
+                if smoothedBandsDrawn == 0
+                    drawAndLabelBands
+                else
+                    drawAndLabelSmoothedBands
+                end
             elseif ct == 0
-                drawAndLabelBandsXray
+                if smoothedBandsDrawn == 0
+                    drawAndLabelBandsXray
+                else
+                    drawAndLabelSmoothedBandsXray
+                end
             end
         catch
             set(lblLoading,'Visible','on','FontSize',12,'String','Cannot display core (code 019)')
@@ -8447,8 +12276,12 @@ areWeGoingBack = 0;
         corePlot4 = [];
         filtParam1In = [];
         filtParam2In = [];
+        smoothParam1In = [];
+        smoothParam2In = [];
         lblParam1 = [];
         lblParam2 = [];
+        lblSmoothParam1 = [];
+        lblSmoothParam2 = [];
         lblFilterType = [];
         searchDistIn = [];
         lblSearchDist = [];
@@ -8914,13 +12747,58 @@ areWeGoingBack = 0;
         flipCore = coralDir.data(dirRow-1,2);
         ct = coralDir.data(dirRow-1,12);
 
-        if serverChoice == 1
-            cache2 = ftp(ftp_ip2,ftp_user2,ftp_password);
-        elseif serverChoice == 2
-            cache2 = ftp(ftp_ip2,ftp_user3,ftp_password);
-        elseif serverChoice == 3
-            cache2 = ftp(ftp_ip1,ftp_user1,ftp_password);
+        try
+            if serverChoice == 1
+                cache2 = sftp(ftp_ip2,ftp_user2,"Password",ftp_password);
+            elseif serverChoice == 2
+                cache2 = sftp(ftp_ip2,ftp_user3,"Password",ftp_password);
+            elseif serverChoice == 3
+                cache2 = sftp(ftp_ip1,ftp_user1,"Password",ftp_password);
+            end
+        catch
+            try
+                connectTimes = [1,2,3,5,10,60,60*12]; % minutes
+                connectionEstablished = 0;
+                for ij = 1:length(connectTimes)
+                    if connectionEstablished == 0
+                        if connectTimes(ij) == 1
+                            waitText = [' ',num2str(connectTimes(ij)),' minute.']
+                        else
+                            waitText = [' ',num2str(connectTimes(ij)),' minutes.']
+                        end
+                        set(lblOpeningError,'Units','Pixels','Visible','on','Position',[200,80,500,40],...
+                            'String',{'Error connecting to server.';strcat('Trying again in',waitText)},...
+                            'Units','normalized')
+                        pause(connectTimes(ij)*60)
+                        try
+                            if serverChoice == 1
+                                cache2 = sftp(ftp_ip2,ftp_user2,"Password",ftp_password)
+                            elseif serverChoice == 2
+                                cache2 = sftp(ftp_ip2,ftp_user3,"Password",ftp_password)
+                            elseif serverChoice == 3
+                                cache2 = sftp(ftp_ip1,ftp_user1,"Password",ftp_password);
+                            end
+                            connectionEstablished = 1;
+                            set(lblOpeningError,'Units','Pixels','Visible','off',...
+                                'Position',[200,150,500,20],'Units','normalized')
+                        catch
+                        end
+                    end
+                end
+                if connectionEstablished == 0
+                    zz = abjfl; % if we made it through end of loop, cause an error to display error code below
+                end
+            catch
+                set(lblOpeningError,'Units','Pixels','Position',[200,80,500,40],'Visible','on',...
+                    'String',{'Error connecting to server. (code 005)';'Please try again later.'},...
+                    'Units','normalized')
+                while 1==1
+                    pause
+                end
+            end
+
         end
+
 
         if strcmp('',thisSectionName)
             server_path = strcat(h_drive,coralDir.textdata{dirRow,3},'/',...
@@ -8964,9 +12842,9 @@ areWeGoingBack = 0;
                 end
             else
                 if strcmp('',thisSectionName)
-                    mget(cache2,'xray.tiff',fullfile(selpath,'my_corals',thisCoralName));
+                    mget(cache2,'xray.tiff',fullfile(selpath,'my_corals',thisCoralName,'Xray'));
                 else
-                    mget(cache2,'xray.tiff',fullfile(selpath,'my_corals',thisCoralName,thisSectionName));
+                    mget(cache2,'xray.tiff',fullfile(selpath,'my_corals',thisCoralName,thisSectionName,'Xray'));
                 end
             end
         else
@@ -9139,32 +13017,58 @@ areWeGoingBack = 0;
 
         try
             if serverChoice == 1
-                cache2 = ftp(ftp_ip2,ftp_user2,ftp_password);
+                cache2 = sftp(ftp_ip2,ftp_user2,"Password",ftp_password)
             elseif serverChoice == 2
-                cache2 = ftp(ftp_ip2,ftp_user3,ftp_password);
+                cache2 = sftp(ftp_ip2,ftp_user3,"Password",ftp_password)
             elseif serverChoice == 3
-                cache2 = ftp(ftp_ip1,ftp_user1,ftp_password);
+                cache2 = sftp(ftp_ip1,ftp_user1,"Password",ftp_password);
             end
         catch
             try
                 if serverChoice == 1
-                    cache2 = ftp(ftp_ip2,ftp_user2,ftp_password);
+                    cache2 = sftp(ftp_ip2,ftp_user2,"Password",ftp_password)
                 elseif serverChoice == 2
-                    cache2 = ftp(ftp_ip2,ftp_user3,ftp_password);
+                    cache2 = sftp(ftp_ip2,ftp_user3,"Password",ftp_password)
                 elseif serverChoice == 3
-                    cache2 = ftp(ftp_ip1,ftp_user1,ftp_password);
+                    cache2 = sftp(ftp_ip1,ftp_user1,"Password",ftp_password);
                 end
             catch
                 try
-                    if serverChoice == 1
-                        cache2 = ftp(ftp_ip2,ftp_user2,ftp_password);
-                    elseif serverChoice == 2
-                        cache2 = ftp(ftp_ip2,ftp_user3,ftp_password);
-                    elseif serverChoice == 3
-                        cache2 = ftp(ftp_ip1,ftp_user1,ftp_password);
+                    connectTimes = [1,2,3,5,10,60,60*12]; % minutes
+                    connectionEstablished = 0;
+                    for ij = 1:length(connectTimes)
+                        if connectionEstablished == 0
+                            if connectTimes(ij) == 1
+                                waitText = [' ',num2str(connectTimes(ij)),' minute.']
+                            else
+                                waitText = [' ',num2str(connectTimes(ij)),' minutes.']
+                            end
+                            set(lblOpeningError,'Units','Pixels','Visible','on','Position',[200,130,500,40],...
+                                'String',{'Error connecting to server.';strcat('Trying again in',waitText)},...
+                                'Units','normalized')
+                            pause(connectTimes(ij)*60)
+                            try
+                                if serverChoice == 1
+                                    cache2 = sftp(ftp_ip2,ftp_user2,"Password",ftp_password)
+                                elseif serverChoice == 2
+                                    cache2 = sftp(ftp_ip2,ftp_user3,"Password",ftp_password)
+                                elseif serverChoice == 3
+                                    cache2 = sftp(ftp_ip1,ftp_user1,"Password",ftp_password);
+                                end
+                                connectionEstablished = 1;
+                                set(lblOpeningError,'Units','Pixels','Visible','off',...
+                                    'Position',[200,150,500,20],'Units','normalized')
+                            catch
+                            end
+                        end
+                    end
+                    if connectionEstablished == 0
+                        zz = abjfl; % if we made it through end of loop, cause an error to display error code below
                     end
                 catch
-                    set(lblOpeningError,'Visible','on','String',{'Error connecting to server. (code 020)';'Please try again later.'})
+                    set(lblOpeningError,'Units','Pixels','Position',[200,130,500,40],'Visible','on',...
+                        'String',{'Error connecting to server. (code 020)';'Please try again later.'},...
+                        'Units','normalized')
                     pause
                     while 1 ~= 2
                         pause
@@ -9261,32 +13165,58 @@ areWeGoingBack = 0;
 
         try
             if serverChoice == 1
-                cache2 = ftp(ftp_ip2,ftp_user2,ftp_password);
+                cache2 = sftp(ftp_ip2,ftp_user2,"Password",ftp_password)
             elseif serverChoice == 2
-                cache2 = ftp(ftp_ip2,ftp_user3,ftp_password);
+                cache2 = sftp(ftp_ip2,ftp_user3,"Password",ftp_password)
             elseif serverChoice == 3
-                cache2 = ftp(ftp_ip1,ftp_user1,ftp_password);
+                cache2 = sftp(ftp_ip1,ftp_user1,"Password",ftp_password);
             end
         catch
             try
                 if serverChoice == 1
-                    cache2 = ftp(ftp_ip2,ftp_user2,ftp_password);
+                    cache2 = sftp(ftp_ip2,ftp_user2,"Password",ftp_password)
                 elseif serverChoice == 2
-                    cache2 = ftp(ftp_ip2,ftp_user3,ftp_password);
+                    cache2 = sftp(ftp_ip2,ftp_user3,"Password",ftp_password)
                 elseif serverChoice == 3
-                    cache2 = ftp(ftp_ip1,ftp_user1,ftp_password);
+                    cache2 = sftp(ftp_ip1,ftp_user1,"Password",ftp_password);
                 end
             catch
                 try
-                    if serverChoice == 1
-                        cache2 = ftp(ftp_ip2,ftp_user2,ftp_password);
-                    elseif serverChoice == 2
-                        cache2 = ftp(ftp_ip2,ftp_user3,ftp_password);
-                    elseif serverChoice == 3
-                        cache2 = ftp(ftp_ip1,ftp_user1,ftp_password);
+                    connectTimes = [1,2,3,5,10,60,60*12]; % minutes
+                    connectionEstablished = 0;
+                    for ij = 1:length(connectTimes)
+                        if connectionEstablished == 0
+                            if connectTimes(ij) == 1
+                                waitText = [' ',num2str(connectTimes(ij)),' minute.']
+                            else
+                                waitText = [' ',num2str(connectTimes(ij)),' minutes.']
+                            end
+                            set(lblOpeningError,'Units','Pixels','Visible','on','Position',[200,130,500,40],...
+                                'String',{'Error connecting to server.';strcat('Trying again in',waitText)},...
+                                'Units','normalized')
+                            pause(connectTimes(ij)*60)
+                            try
+                                if serverChoice == 1
+                                    cache2 = sftp(ftp_ip2,ftp_user2,"Password",ftp_password)
+                                elseif serverChoice == 2
+                                    cache2 = sftp(ftp_ip2,ftp_user3,"Password",ftp_password)
+                                elseif serverChoice == 3
+                                    cache2 = sftp(ftp_ip1,ftp_user1,"Password",ftp_password);
+                                end
+                                connectionEstablished = 1;
+                                set(lblOpeningError,'Units','Pixels','Visible','off',...
+                                    'Position',[200,150,500,20],'Units','normalized')
+                            catch
+                            end
+                        end
+                    end
+                    if connectionEstablished == 0
+                        zz = abjfl; % if we made it through end of loop, cause an error to display error code below
                     end
                 catch
-                    set(lblOpeningError,'Visible','on','String',{'Error connecting to server. (code 021)';'Please try again later.'})
+                    set(lblOpeningError,'Units','Pixels','Visible','on','Position',[200,130,500,40],...
+                        'String',{'Error connecting to server. (code 021)';'Please try again later.'},...
+                        'Units','normalized')
                     pause
                     while 1 ~= 2
                         pause
@@ -9411,17 +13341,14 @@ areWeGoingBack = 0;
 
         % load data
 
-        processNumber = processNumber + 1;
+        %processNumber = processNumber + 1;
         titleName = 'loading CT data';
-
         [X,metadata,sliceLoc] = read_dcm(fileOpen,1);
-        %X = single(X);
+
+        % rotate
+        X = permute(X,[2,1,3]);
 
         [row,col,layers] = size(X); % size of the image
-
-        % above reads the core in 'upside down', so let's just reverse it
-
-        X = permute(X,[2,1,3]);
 
         % image pixel spacing
         hpxS = metadata.PixelSpacing(1);
@@ -9518,6 +13445,10 @@ areWeGoingBack = 0;
                     if min(abs(allSlice-metadata.SliceLocation)) == 0
                         skipCheck = 1;
                     end
+                elseif isfield(metadata,'ImagePositionPatient') == 1
+                    if min(abs(allSlice-metadata.ImagePositionPatient(3))) == 0
+                        skipCheck = 1;
+                    end
                 elseif isfield(metadata,'InstanceNumber') == 1
                     if min(abs(allSlice-metadata.InstanceNumber)) == 0
                         skipCheck = 1;
@@ -9529,6 +13460,8 @@ areWeGoingBack = 0;
                 X(:,:,i1+layerCount-skip) = x;
                 if isfield(metadata,'SliceLocation') == 1
                     sliceLoc(i1+layerCount-skip) = metadata.SliceLocation;
+                elseif isfield(metadata,'ImagePositionPatient') == 1
+                    sliceLoc(i1+layerCount-skip) = metadata.ImagePositionPatient(3);
                 elseif isfield(metadata,'InstanceNumber') == 1
                     sliceLoc(i1+layerCount-skip) = metadata.InstanceNumber;
                 end
@@ -9543,6 +13476,10 @@ areWeGoingBack = 0;
                     if min(abs(allSlice-metadata.SliceLocation)) == 0
                         skip = skip + 1;
                     end
+                elseif isfield(metadata,'ImagePositionPatient') == 1
+                    if min(abs(allSlice-metadata.ImagePositionPatient(3))) == 0
+                        skip = skip + 1;
+                    end
                 elseif isfield(metadata,'InstanceNumber') == 1
                     if min(abs(allSlice-metadata.InstanceNumber)) == 0
                         skip = skip + 1;
@@ -9551,6 +13488,8 @@ areWeGoingBack = 0;
 
                 if isfield(metadata,'SliceLocation') == 1
                     allSlice = [allSlice metadata.SliceLocation];
+                elseif isfield(metadata,'ImagePositionPatient') == 1
+                    allSlice = [allSlice metadata.ImagePositionPatient(3)];
                 elseif isfield(metadata,'InstanceNumber') == 1
                     allSlice = [allSlice metadata.InstanceNumber];
                 end
@@ -9581,7 +13520,7 @@ areWeGoingBack = 0;
 
         % Script to build a map of where a core exists in a 3D coral CT scan
 
-        processNumber = processNumber + 1;
+        %processNumber = processNumber + 1;
         titleName = 'Mapping Core';
 
         warning('off','all')
@@ -9600,7 +13539,7 @@ areWeGoingBack = 0;
         end
 
         % initialize filtered image
-        filteredXcore = zeros(row,col);
+        filteredXcore = zeros(size(X(:,:,1)));
 
         % initialize matrix to store indices of where coral, cracks exist
         coral = zeros(row,col,topCore);
@@ -9653,9 +13592,9 @@ areWeGoingBack = 0;
 
             % set borders to 0
             coral(:,1,i) = 0;
-            coral(:,row,i) = 0;
+            coral(:,col,i) = 0;
             coral(1,:,i) = 0;
-            coral(col,:,i) = 0;
+            coral(row,:,i) = 0;
 
             if thresh > -800 && sum(sum(coral(:,:,i))) > 500
 
@@ -9742,7 +13681,7 @@ areWeGoingBack = 0;
 
         % function to compute density between annual density bands in coral CT scans
 
-        processNumber = processNumber + 1;
+        %processNumber = processNumber + 1;
         titleName = 'Annual density';
 
         % initialize storage
@@ -9900,7 +13839,7 @@ areWeGoingBack = 0;
                 end
                 warning('on','all');
             end
-            band_filt(:,:,i4) = nanconv(LDBdata(:,:,i4), h2, 'nanout');
+            band_filt(:,:,i4) = nanconv(LDBdata(:,:,i4), h3, 'nanout');
         end
 
         totBands2 = length(find(max(max(~isnan(band_filt))))>0);
@@ -9978,8 +13917,8 @@ areWeGoingBack = 0;
         % make smoothed bands first
         LDBdata = zeros(col,totBands);
         band_filt = NaN(size(LDBdata));
-        h2d = sum(h2);
-        h2mid = ceil(length(h2(:,1))/2);
+        h2d = sum(h3);
+        h2mid = ceil(length(h3(:,1))/2);
         for i4 = 1:totBands
             if max(max(userBands(:,i4)))>0
                 c = find(userBands(:,i4));
@@ -10057,7 +13996,11 @@ processingGrowth = 0;
     function progressUpdate(fraction)
 
         if (strcmp(CoralCTformat,'mchips') || strcmp(CoralCTformat,'windows')) && ct && processingGrowth == 1
-            title(ha3,[titleName,': ',num2str(round(fraction*100)),'%'],'Color','white')
+            if doingDensCalib == 1
+                title(ha3,[titleName,': ',num2str(round(fraction*100)),'%'],'Color','k')
+            else
+                title(ha3,[titleName,': ',num2str(round(fraction*100)),'%'],'Color','white')
+            end
             set(ha3,'Color',[0.2 0.2 0.2])
         else
             title(ha3,[titleName,': ',num2str(round(fraction*100)),'%'])
@@ -10072,7 +14015,7 @@ processingGrowth = 0;
 
     end
 
-
+h3_defined = 0;
     function chooseCoreFilter
 
         % filter for core identification
@@ -10081,18 +14024,32 @@ processingGrowth = 0;
         % see the length of one voxel (in mm). Enter 'surf(h2)' in workspace to
         % visualize what the filter looks like.
         conversion_factor = (1./hpxS).*0.1; %(pixels per 0.1mm)
+        if h3_defined == 0
+            h3_width = 40;
+            h3_std = 15;
+            h3_defined = 1;
+        end
+        h3 = fspecial('gaussian',round(h3_width*conversion_factor), h3_std*conversion_factor);
         if strcmp(gen,'Porites')
+            h2 = fspecial('gaussian',round(40*conversion_factor), 10*conversion_factor);
+        elseif strcmp(gen,'Psammacora')
             h2 = fspecial('gaussian',round(40*conversion_factor), 10*conversion_factor);
         elseif strcmp(gen,'Siderastrea')
             h2 = fspecial('gaussian',round(40*conversion_factor), 10*conversion_factor);
         elseif strcmp(gen,'Montastrea') || strcmp(gen,'Orbicella')
-            h2 = fspecial('gaussian',round(40*conversion_factor), 20*conversion_factor);
+            h2 = fspecial('gaussian',round(60*conversion_factor), 20*conversion_factor);
         elseif strcmp(gen,'Diploastrea')
-            h2 = fspecial('gaussian',round(20*conversion_factor), 10*conversion_factor);
+            h2 = fspecial('gaussian',round(60*conversion_factor), 20*conversion_factor);
         elseif strcmp(gen,'Diploria')
-            h2 = fspecial('gaussian',round(15*conversion_factor), 7*conversion_factor);
+            h2 = fspecial('gaussian',round(60*conversion_factor), 20*conversion_factor);
+        elseif strcmp(gen,'Pseudodiploria')
+            h2 = fspecial('gaussian',round(60*conversion_factor), 20*conversion_factor);
         elseif strcmp(gen,'Favia')
-            h2 = fspecial('gaussian',round(40*conversion_factor), 10*conversion_factor);
+            h2 = fspecial('gaussian',round(60*conversion_factor), 20*conversion_factor);
+        elseif strcmp(gen,'Mussimilia')
+            h2 = fspecial('gaussian',round(60*conversion_factor), 20*conversion_factor);
+        elseif strcmp(gen,'Mussismilia')
+            h2 = fspecial('gaussian',round(60*conversion_factor), 20*conversion_factor);
         end
 
     end
