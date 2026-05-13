@@ -10,13 +10,7 @@ function CoralCT_public
 % This script is not intended to be used for analysis. Please use the main
 % CoralCT app to conduct any measurements. Additionally, this script may
 % encounter errors as not all features have been tested following redaction
-% of non-public aspects from the main app script. Extra variable names may
-% also exist, due to removal of features associated with usernames.
-%
-% Built with MATLAB 2023a. Other MATLAB versions might encounter lack of
-% functionality or errors. As noted above, the CoralCT app should be used
-% for doing any actual work, this code is shared for the sake of
-% transparency.
+% of non-public aspects from the main app script.
 %
 % Use the MATLAB "Run" button to execute this script and then interact with
 % the program through the user interface that opens.
@@ -26,7 +20,7 @@ function CoralCT_public
 %
 %   PLEASE CITE AS:
 %   DeCarlo TM, Whelehan A, Hedger B, Perry D, Pompel M, Jasnos O, 
-%   Strange A (2024) CoralCT: A platform for transparent and collaborative
+%   Strange A (2025) CoralCT: A platform for transparent and collaborative
 %   analyses of growth parameters in coral skeletal cores. Limnology and 
 %   Oceanography: Methods.
 %   ============================
@@ -112,8 +106,8 @@ refPath0split = strsplit(refPath0,'ref_file.mat');
 refPath = refPath0split{1};
 
 % Set location of sftp Server:
-ftp_ip1 = 'access-5017242120.webspace-host.com'; % could use different server for login info if desired
-ftp_ip2 = 'access-5017242120.webspace-host.com'; % main data location
+ftp_ip1 = 'sftp.hidrive.ionos.com';
+ftp_ip2 = 'sftp.hidrive.ionos.com';
 ftp_user1 = 'a2222258';
 ftp_user2 = 'a2222258';
 ftp_password = 'We<3Corals';
@@ -259,7 +253,7 @@ catch
 end
 
 % make sure we can access CoralCache folder of sftp server 1
-try cd(cache1,'/CoralCache');
+try cd(cache1,'coralct/CoralCache');
 catch
     if strcmp(CoralCTformat,'mchips') || strcmp(CoralCTformat,'windows')
         set(UserFig0,'Visible','on')
@@ -362,7 +356,7 @@ pause(0.01) % to ensure refreshed figures
 try mget(cache1,'coral_directory_master.txt',fullfile(selpath,'my_corals'));
 catch
     cache1 = sftp(ftp_ip1,ftp_user1,"Password",ftp_password); % make sure we can connect to sftp server 1
-    cd(cache1,'/CoralCache');
+    cd(cache1,'coralct/CoralCache');
     mget(cache1,'coral_directory_master.txt',fullfile(selpath,'my_corals'));
 end
 
@@ -658,7 +652,7 @@ saveFileName = [];
             catch
                 try
                     cache1 = sftp(ftp_ip1,ftp_user1,"Password",ftp_password);
-                    cd(cache1,'CoralCache')
+                    cd(cache1,'coralct/CoralCache')
                     mget(cache1,'user_directory_names.csv',refPath);
                 catch
                     try
@@ -676,7 +670,7 @@ saveFileName = [];
                                 pause(connectTimes(ij)*60)
                                 try
                                     cache1 = sftp(ftp_ip1,ftp_user1,"Password",ftp_password);
-                                    cd(cache1,'CoralCache')
+                                    cd(cache1,'coralct/CoralCache')
                                     mget(cache1,'user_directory_names.csv',refPath);
                                     connectionEstablished = 1;
                                     set(lblLoading,'Visible','off')
@@ -1402,7 +1396,7 @@ userTable3 = [];
                     end
                 end
             end
-            cd(cache1,'/CoralCache');
+            cd(cache1,'coralct/CoralCache');
             mget(cache1,'log.csv',strcat(refPath));
             close(cache1);
         end
@@ -1418,7 +1412,7 @@ userTable3 = [];
         try mget(cache1,'user_agreement_scores.csv',strcat(refPath));
         catch
             cache1 = sftp(ftp_ip1,ftp_user1,"Password",ftp_password); % make sure we can connect to sftp server 1
-            cd(cache1,'/CoralCache');
+            cd(cache1,'coralct/CoralCache');
             mget(cache1,'user_agreement_scores.csv',strcat(refPath));
             close(cache1);
         end
@@ -1519,7 +1513,7 @@ stdGroupsNum = [];
         catch
         end
         try cache2 = sftp(ftp_ip2,ftp_user2,"Password",ftp_password); %
-            cd(cache2,strcat('/hd1/standards/',stdGroups{stdGroupsNum},'/'))
+            cd(cache2,strcat('coralct/hd1/standards/',stdGroups{stdGroupsNum},'/'))
             dirStdFolders = dir(cache2);
             stdFolders = {'';''};
             for jjj = 1:length(dirStdFolders)
@@ -1541,7 +1535,7 @@ stdGroupsNum = [];
                     pause(connectTimes(ij)*60)
                     try
                         cache2 = sftp(ftp_ip2,ftp_user2,"Password",ftp_password); %
-                        cd(cache2,strcat('/hd1/standards/',stdGroups{stdGroupsNum},'/'))
+                        cd(cache2,strcat('coralct/hd1/standards/',stdGroups{stdGroupsNum},'/'))
                         dirStdFolders = dir(cache2);
                         stdFolders = {'';''};
                         for jjj = 1:length(dirStdFolders)
@@ -1640,7 +1634,7 @@ calibLine = [];
             end
             try
                 cache2 = sftp(ftp_ip2,ftp_user2,"Password",ftp_password); %
-                cd(cache2,strcat('/hd1/standards/',stdGroups{stdGroupsNum},'/',densNames(iDens)));
+                cd(cache2,strcat('coralct/hd1/standards/',stdGroups{stdGroupsNum},'/',densNames(iDens)));
                 mget(cache2,'dicoms.zip',fullfile(selpath,'my_corals','standards'));
             catch
                 connectTimes = [1,2,3,5,10,60,60*12]; % minutes
@@ -1658,7 +1652,7 @@ calibLine = [];
                         pause(connectTimes(ij)*60)
                         try
                             cache2 = sftp(ftp_ip2,ftp_user2,"Password",ftp_password); %
-                            cd(cache2,strcat('/hd1/standards/',stdGroups{stdGroupsNum},'/',densNames(iDens)));
+                            cd(cache2,strcat('coralct/hd1/standards/',stdGroups{stdGroupsNum},'/',densNames(iDens)));
                             mget(cache2,'dicoms.zip',fullfile(selpath,'my_corals','standards'));
                             connectionEstablished = 1;
                             set(htextCalibStatus,'Visible','off')
@@ -1805,7 +1799,7 @@ core4calibEqn = [];
             catch
                 try
                     cache1 = sftp(ftp_ip1,ftp_user1,"Password",ftp_password);
-                    cd(cache1,'CoralCache')
+                    cd(cache1,'coralct/CoralCache')
                     mput(cache1,fullfile(selpath,'my_corals','coral_directory_master.txt'));
                 catch
                     connectTimes = [1,2,3,5,10,60,60*12]; % minutes
@@ -1823,7 +1817,7 @@ core4calibEqn = [];
                             pause(connectTimes(ij)*60)
                             try
                                 cache1 = sftp(ftp_ip1,ftp_user1,"Password",ftp_password);
-                                cd(cache1,'CoralCache')
+                                cd(cache1,'coralct/CoralCache')
                                 mput(cache1,fullfile(selpath,'my_corals','coral_directory_master.txt'));
                                 connectionEstablished = 1;
                                 set(htextCalibStatus,'Visible','off')
@@ -1927,7 +1921,7 @@ lblStderror = uicontrol(UserFig,'Style','text','String','Error finding standards
         catch
         end
         try cache2 = sftp(ftp_ip2,ftp_user2,"Password",ftp_password); %
-            cd(cache2,'/hd1/standards/')
+            cd(cache2,'coralct/hd1/standards/')
             dirStd = dir(cache2);
             stdGroups = {'';''};
             for jj = 1:length(dirStd)
@@ -2051,7 +2045,7 @@ coreDirIn = uicontrol(UserFig,'Style','pushbutton',...
                 end
             end
             
-            cd(cache1,'/CoralCache');
+            cd(cache1,'coralct/CoralCache');
             mget(cache1,'coral_directory_citations.txt',fullfile(selpath,'my_corals'));
             close(cache1);
             citationDir = importdata(fullfile(selpath,'my_corals','coral_directory_citations.txt'));
@@ -2083,7 +2077,7 @@ coreDirIn = uicontrol(UserFig,'Style','pushbutton',...
         try mget(cache1,'log.csv',strcat(refPath));
         catch
             cache1 = sftp(ftp_ip1,ftp_user1,"Password",ftp_password); % make sure we can connect to sftp server 1
-            cd(cache1,'/CoralCache');
+            cd(cache1,'coralct/CoralCache');
             mget(cache1,'log.csv',strcat(refPath));
             close(cache1);
         end
@@ -4363,7 +4357,7 @@ lblSendingDirect = [];
                     end
                 end
             end
-            cd(cache1,'CoralCache')
+            cd(cache1,'coralct/CoralCache')
             cd(cache1,'submitted_data')
         end
 
@@ -4414,7 +4408,7 @@ lblSendingDirect = [];
 
         close(cache1)
         cache1 = sftp(ftp_ip1,ftp_user1,"Password",ftp_password);
-        cd(cache1,'CoralCache')
+        cd(cache1,'coralct/CoralCache')
         %if thisWorked == 1
             try
                 try mget(cache1,'submission_log.csv',strcat(refPath));
@@ -4521,7 +4515,7 @@ lblSendingDirect = [];
                     end
                 end
             end
-            cd(cache1,'CoralCache')
+            cd(cache1,'coralct/CoralCache')
             cd(cache1,'submitted_data')
         end
 
@@ -4573,7 +4567,7 @@ lblSendingDirect = [];
 
         close(cache1)
         cache1 = sftp(ftp_ip1,ftp_user1,"Password",ftp_password);
-        cd(cache1,'CoralCache')
+        cd(cache1,'coralct/CoralCache')
 
         %if thisWorked == 1
             try
@@ -4682,7 +4676,7 @@ lblSendingDirect = [];
                     end
                 end
             end
-            cd(cache1,'CoralCache')
+            cd(cache1,'coralct/CoralCache')
             cd(cache1,'submitted_data')
         end
 
@@ -4734,7 +4728,7 @@ lblSendingDirect = [];
 
         close(cache1)
         cache1 = sftp(ftp_ip1,ftp_user1,"Password",ftp_password);
-        cd(cache1,'CoralCache');
+        cd(cache1,'coralct/CoralCache');
         %if thisWorked == 1
             try
                 try mget(cache1,'submission_log.csv',strcat(refPath));
@@ -4839,7 +4833,7 @@ lblSendingDirect = [];
                     end
                 end
             end
-            cd(cache1,'CoralCache')
+            cd(cache1,'coralct/CoralCache')
             cd(cache1,'submitted_data')
         end
 
@@ -4891,7 +4885,7 @@ lblSendingDirect = [];
 
         close(cache1)
         cache1 = sftp(ftp_ip1,ftp_user1,"Password",ftp_password);
-        cd(cache1,'CoralCache');
+        cd(cache1,'coralct/CoralCache');
         %if thisWorked == 1
             try
                 try mget(cache1,'submission_log.csv',strcat(refPath));
@@ -4970,7 +4964,7 @@ lblSendingDirect = [];
                     end
                 end
             end
-            cd(cache1,'CoralCache')
+            cd(cache1,'coralct/CoralCache')
         end
 
         try
@@ -5068,7 +5062,7 @@ lblSendingDirect = [];
                     end
                 end
             end
-            cd(cache1,'CoralCache')
+            cd(cache1,'coralct/CoralCache')
             cd(cache1,'submitted_data')
         end
 
@@ -5105,7 +5099,7 @@ lblSendingDirect = [];
 
         close(cache1)
         cache1 = sftp(ftp_ip1,ftp_user1,"Password",ftp_password);
-        cd(cache1,'CoralCache')
+        cd(cache1,'coralct/CoralCache')
 
         if thisWorked == 1
             try
@@ -5332,7 +5326,7 @@ lblMapClick = [];
                 try
                     close(cache1)
                     cache1 = sftp(ftp_ip1,ftp_user1,"Password",ftp_password);
-                    cd(cache1,'CoralCache')
+                    cd(cache1,'coralct/CoralCache')
                 catch
                     try
                         connectTimes = [1,2,3,5,10,60,60*12]; % minutes
@@ -5349,7 +5343,7 @@ lblMapClick = [];
                                 pause(connectTimes(ij)*60)
                                 try
                                     cache1 = sftp(ftp_ip1,ftp_user1,"Password",ftp_password);
-                                    cd(cache1,'CoralCache')
+                                    cd(cache1,'coralct/CoralCache')
                                     connectionEstablished = 1;
                                     set(lblVerifying,'Visible','off')
                                 catch
@@ -5426,7 +5420,7 @@ lblMapClick = [];
                 try
                     close(cache1)
                     cache1 = sftp(ftp_ip1,ftp_user1,"Password",ftp_password);
-                    cd(cache1,'CoralCache')
+                    cd(cache1,'coralct/CoralCache')
                 catch
                     try
                         connectTimes = [1,2,3,5,10,60,60*12]; % minutes
@@ -5443,7 +5437,7 @@ lblMapClick = [];
                                 pause(connectTimes(ij)*60)
                                 try
                                     cache1 = sftp(ftp_ip1,ftp_user1,"Password",ftp_password);
-                                    cd(cache1,'CoralCache')
+                                    cd(cache1,'coralct/CoralCache')
                                     connectionEstablished = 1;
                                     set(lblVerifying,'Visible','off')
                                 catch
@@ -5505,11 +5499,11 @@ lblMapClick = [];
                 %cache = sftp(ftp_ip,'CoralCache_beta','Corals1234'); %
                 try cd(cache1,'shorelines');
                 catch
-                    try cd(cache1,'CoralCache')
+                    try cd(cache1,'coralct/CoralCache')
                         cd(cache1,'shorelines');
                     catch
                         cache1 = sftp(ftp_ip1,ftp_user1,"Password",ftp_password);
-                        cd(cache1,'CoralCache')
+                        cd(cache1,'coralct/CoralCache')
                         cd(cache1,'shorelines');
                     end
                 end
@@ -5543,7 +5537,7 @@ lblMapClick = [];
                 try
                     close(cache1)
                     cache1 = sftp(ftp_ip1,ftp_user1,"Password",ftp_password);
-                    cd(cache1,'CoralCache')
+                    cd(cache1,'coralct/CoralCache')
                 catch
                     try
                         connectTimes = [1,2,3,5,10,60,60*12]; % minutes
@@ -5560,7 +5554,7 @@ lblMapClick = [];
                                 pause(connectTimes(ij)*60)
                                 try
                                     cache1 = sftp(ftp_ip1,ftp_user1,"Password",ftp_password);
-                                    cd(cache1,'CoralCache')
+                                    cd(cache1,'coralct/CoralCache')
                                     connectionEstablished = 1;
                                     set(lblVerifying,'Visible','off')
                                 catch
@@ -5604,7 +5598,7 @@ lblMapClick = [];
             catch
                 %cache = sftp(ftp_ip,'CoralCache_beta','Corals1234'); %
                 cache1 = sftp(ftp_ip1,ftp_user1,"Password",ftp_password);
-                cd(cache1,'CoralCache')
+                cd(cache1,'coralct/CoralCache')
                 cd(cache1,'shorelines');
                 subregionfile = double(currentSubRegion{1});
                 dMap = dir(cache1);
@@ -5636,7 +5630,7 @@ lblMapClick = [];
                 try
                     close(cache1)
                     cache1 = sftp(ftp_ip1,ftp_user1,"Password",ftp_password);
-                    cd(cache1,'CoralCache')
+                    cd(cache1,'coralct/CoralCache')
                 catch
                     try
                         connectTimes = [1,2,3,5,10,60,60*12]; % minutes
@@ -5653,7 +5647,7 @@ lblMapClick = [];
                                 pause(connectTimes(ij)*60)
                                 try
                                     cache1 = sftp(ftp_ip1,ftp_user1,"Password",ftp_password);
-                                    cd(cache1,'CoralCache')
+                                    cd(cache1,'coralct/CoralCache')
                                     connectionEstablished = 1;
                                     set(lblVerifying,'Visible','off')
                                 catch
@@ -6534,7 +6528,7 @@ checkSpeedIn = uicontrol(UserFig,'Style','pushbutton',...
 
         pause(0.01)
 
-        h_drive = '/hd1/';
+        h_drive = 'coralct/hd1/';
 
         thisCoralName = 'F53B';
         test_row = find(strcmp(coralDir.textdata(:,1),thisCoralName));
@@ -6773,7 +6767,7 @@ viewScreenshotsIn = [];
             drawnow
             thisSectionName = sectionName;
             thisCoralName = coralName;
-            h_drive = '/hd1/';
+            h_drive = 'coralct/hd1/';
             serverChoice = 1;
 
             dirRow = 0;
@@ -8212,7 +8206,7 @@ areWeGoingBack = 0;
                 catch
                     try
                         cache1 = sftp(ftp_ip1,ftp_user1,"Password",ftp_password);
-                        cd(cache1,'CoralCache')
+                        cd(cache1,'coralct/CoralCache')
                         mput(cache1,fullfile(selpath,'my_corals','coral_directory_master.txt'));
                     catch
                     end
@@ -11387,10 +11381,10 @@ areWeGoingBack = 0;
         function process_Callback(source,eventdata)
 
             try cache1 = sftp(ftp_ip1,ftp_user1,"Password",ftp_password);
-                cd(cache1,'CoralCache')
+                cd(cache1,'coralct/CoralCache')
             catch
                 try cache1 = sftp(ftp_ip1,ftp_user1,"Password",ftp_password);
-                    cd(cache1,'CoralCache')
+                    cd(cache1,'coralct/CoralCache')
                 catch
                     try
                         connectTimes = [1,2,3,5,10,60,60*12]; % minutes
@@ -12735,13 +12729,13 @@ areWeGoingBack = 0;
         serverChoice = [];
         if coralDir.data(dirRow-1,1) == 1
             serverChoice = 1;
-            h_drive = '/hd1/';
+            h_drive = 'coralct/hd1/';
         elseif coralDir.data(dirRow-1,1) == 2
             serverChoice = 2;
-            h_drive = '/hd1/';
+            h_drive = 'coralct/hd1/';
         elseif coralDir.data(dirRow-1,1) == 3
             serverChoice = 1;
-            h_drive = '/hd1/';
+            h_drive = 'coralct/hd1/';
         end
 
         flipCore = coralDir.data(dirRow-1,2);
@@ -13003,13 +12997,13 @@ areWeGoingBack = 0;
         serverChoice = [];
         if coralDir.data(dirRow-1,1) == 1
             serverChoice = 1;
-            h_drive = '/hd1/';
+            h_drive = 'coralct/hd1/';
         elseif coralDir.data(dirRow-1,1) == 2
             serverChoice = 2;
-            h_drive = '/hd1/';
+            h_drive = 'coralct/hd1/';
         elseif coralDir.data(dirRow-1,1) == 3
             serverChoice = 3;
-            h_drive = '/hd1/';
+            h_drive = 'coralct/hd1/';
         end
         if coralDir.data(dirRow-1,2) == 1
             flipCore = 1;
@@ -13151,13 +13145,13 @@ areWeGoingBack = 0;
         serverChoice = [];
         if coralDir.data(dirRow-1,1) == 1
             serverChoice = 1;
-            h_drive = '/hd1/';
+            h_drive = 'coralct/hd1/';
         elseif coralDir.data(dirRow-1,1) == 2
             serverChoice = 2;
-            h_drive = '/hd1/';
+            h_drive = 'coralct/hd1/';
         elseif coralDir.data(dirRow-1,1) == 3
             serverChoice = 3;
-            h_drive = '/hd1/';
+            h_drive = 'coralct/hd1/';
         end
         if coralDir.data(dirRow-1,2) == 1
             flipCore = 1;
@@ -13284,13 +13278,13 @@ areWeGoingBack = 0;
         serverChoice = [];
         if coralDir.data(dirRow-1,1) == 1
             serverChoice = 1;
-            h_drive = '/hd1/';
+            h_drive = 'coralct/hd1/';
         elseif coralDir.data(dirRow-1,1) == 2
             serverChoice = 2;
-            h_drive = '/hd1/';
+            h_drive = 'coralct/hd1/';
         elseif coralDir.data(dirRow-1,1) == 3
             serverChoice = 3;
-            h_drive = '/hd1/';
+            h_drive = 'coralct/hd1/';
         end
         if coralDir.data(dirRow-1,2) == 1
             flipCore = 1;
